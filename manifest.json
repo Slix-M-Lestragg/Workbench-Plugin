@@ -1,7 +1,7 @@
 {
 	"id": "workbench-plugin",
 	"name": "Workbench Plugin",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"minAppVersion": "0.0.0",
 	"description": "Improves usages of external tools. Currently only support ComfyUI.",
 	"isDesktopOnly": true
