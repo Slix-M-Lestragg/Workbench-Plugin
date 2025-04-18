@@ -22,6 +22,7 @@
 		"typescript": "latest"
 	},
 	"dependencies": {
-		"@saintno/comfyui-sdk": "^0.2.45"
+		"@saintno/comfyui-sdk": "^0.2.45",
+		"electron": "^35.1.5"
 	}
 }

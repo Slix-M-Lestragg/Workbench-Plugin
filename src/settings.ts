@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import type Workbench from './main'; // Use type import
+import type Workbench from './main';
 
 export interface WorkbenchSettings {
     comfyApiUrl: string;
@@ -10,6 +10,10 @@ export interface WorkbenchSettings {
     };
     enablePolling: boolean;
     pollingIntervalSeconds: number;
+    launchCheckDelaySeconds: number;
+    enablePollingRetry: boolean; // <-- Add this
+    pollingRetryAttempts: number; // <-- Add this
+    pollingRetryDelaySeconds: number; // <-- Add this
 }
 
 export const DEFAULT_SETTINGS: WorkbenchSettings = {
@@ -21,8 +25,11 @@ export const DEFAULT_SETTINGS: WorkbenchSettings = {
     },
     enablePolling: true,
     pollingIntervalSeconds: 5,
+    launchCheckDelaySeconds: 5,
+    enablePollingRetry: true, // <-- Add default
+    pollingRetryAttempts: 3, // <-- Add default
+    pollingRetryDelaySeconds: 10, // <-- Add default
 }
-
 
 export class SampleSettingTab extends PluginSettingTab {
     plugin: Workbench;
@@ -99,6 +106,22 @@ export class SampleSettingTab extends PluginSettingTab {
                     this.plugin.launchComfyUiScript();
                 }));
 
+        // Add setting for launch delay
+        new Setting(containerEl)
+            .setName('Launch Connection Check Delay (seconds)')
+            .setDesc('How long to wait after launching ComfyUI before checking the API connection.')
+            .addText(text => text
+                .setPlaceholder('e.g., 5')
+                .setValue(this.plugin.settings.launchCheckDelaySeconds.toString())
+                .onChange(async (value) => {
+                    let delay = parseInt(value || '5', 10);
+                    if (isNaN(delay) || delay < 1) {
+                        delay = 5; // Ensure a minimum delay
+                    }
+                    this.plugin.settings.launchCheckDelaySeconds = delay;
+                    await this.plugin.saveSettings();
+                }));
+
         containerEl.createEl('h3', { text: 'Status Polling' });
 
         new Setting(containerEl)
@@ -135,5 +158,58 @@ export class SampleSettingTab extends PluginSettingTab {
                          this.plugin.startPolling(); // Restart polling
                     }
                 }));
+
+        // --- Add Polling Retry Settings ---
+        new Setting(containerEl)
+            .setName('Enable Polling Retry on Error')
+            .setDesc('If polling fails (e.g., server temporarily unavailable), automatically retry a few times before stopping.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enablePollingRetry)
+                .onChange(async (value) => {
+                    this.plugin.settings.enablePollingRetry = value;
+                    await this.plugin.saveSettings();
+                    // Reset retry count if retries are disabled
+                    if (!value) {
+                        this.plugin.pollingRetryCount = 0;
+                        if (this.plugin.pollingRetryTimeoutId) {
+                            clearTimeout(this.plugin.pollingRetryTimeoutId);
+                            this.plugin.pollingRetryTimeoutId = null;
+                        }
+                    }
+                    this.display(); // Refresh display to show/hide dependent settings
+                }));
+
+        // Only show retry attempts/delay if retry is enabled
+        if (this.plugin.settings.enablePollingRetry) {
+            new Setting(containerEl)
+                .setName('Polling Retry Attempts')
+                .setDesc('How many times to retry polling after an error.')
+                .addText(text => text
+                    .setPlaceholder('e.g., 3')
+                    .setValue(this.plugin.settings.pollingRetryAttempts.toString())
+                    .onChange(async (value) => {
+                        let attempts = parseInt(value || '3', 10);
+                        if (isNaN(attempts) || attempts < 0) {
+                            attempts = 0; // Allow 0 retries
+                        }
+                        this.plugin.settings.pollingRetryAttempts = attempts;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Polling Retry Delay (seconds)')
+                .setDesc('How long to wait between polling retry attempts.')
+                .addText(text => text
+                    .setPlaceholder('e.g., 10')
+                    .setValue(this.plugin.settings.pollingRetryDelaySeconds.toString())
+                    .onChange(async (value) => {
+                        let delay = parseInt(value || '10', 10);
+                        if (isNaN(delay) || delay < 1) {
+                            delay = 1; // Minimum 1 second delay
+                        }
+                        this.plugin.settings.pollingRetryDelaySeconds = delay;
+                        await this.plugin.saveSettings();
+                    }));
+        }
     }
 }

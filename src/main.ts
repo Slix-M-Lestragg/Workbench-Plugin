@@ -1,11 +1,11 @@
 import { Plugin } from 'obsidian';
 import { WorkbenchSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
-import { ComfyApi, ComfyStatus } from './comfy/types'; // Import types
-import { setupStatusBar, updateStatusBar } from './ui/status_bar'; // Import status bar functions
-import { checkComfyConnection } from './comfy/api'; // Import API functions
-import { startPolling, stopPolling, pollStatus } from './comfy/polling'; // Import polling functions
-import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch'; // Import launch functions
-import { registerCommands } from './commands'; // Import command registration
+import { ComfyApi, ComfyStatus } from './comfy/types';
+import { setupStatusBar, updateStatusBar } from './ui/status_bar';
+import { checkComfyConnection } from './comfy/api';
+import { startPolling, stopPolling, pollStatus } from './comfy/polling';
+import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch';
+import { registerCommands } from './commands';
 
 export default class Workbench extends Plugin {
     settings: WorkbenchSettings;
@@ -13,34 +13,37 @@ export default class Workbench extends Plugin {
     statusBarItemEl: HTMLElement | null = null;
     currentComfyStatus: ComfyStatus = 'Disconnected';
     pollingIntervalId: number | null = null;
+    pollingRetryCount: number = 0; // <-- Add retry counter
+    pollingRetryTimeoutId: number | null = null; // <-- Add retry timeout ID
 
-    // --- Make methods needed by other modules public or pass `this` ---
-    // We will pass `this` (pluginInstance) to the imported functions
-
-    // Expose necessary methods for external modules (if needed, otherwise pass `this`)
-    // Example: If settings tab needs direct access beyond passing `this`
+    // --- Public methods for modules ---
     public startPolling = () => startPolling(this);
     public stopPolling = () => stopPolling(this);
     public launchComfyUiScript = () => launchComfyUiScript(this);
+    public launchComfyUiDesktopApp = () => launchComfyUiDesktopApp(this); // Added missing public method
     public checkComfyConnection = () => checkComfyConnection(this);
     // updateStatusBar is imported and used directly where needed, passing `this`
+    public pollStatus = () => pollStatus(this); // Expose pollStatus if needed by retry logic
 
     /* Lifecycle Methods */
     async onload() {
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
-        // Setup UI elements and commands by calling imported functions
         setupStatusBar(this);
         registerCommands(this);
 
-        // Optional: Initial connection check on load (consider if needed)
-        // setTimeout(() => this.checkComfyConnection(), 500);
+        setTimeout(() => {
+            console.log("Performing initial ComfyUI connection check...");
+            if (this.currentComfyStatus === 'Disconnected') {
+                 this.checkComfyConnection();
+            }
+        }, 1500);
     }
 
     onunload() {
         this.statusBarItemEl?.remove();
-        this.stopPolling(); // Call the instance method which calls the imported function
+        this.stopPolling(); // stopPolling will now also clear retry timeouts
     }
 
     /* Settings Methods */
@@ -50,6 +53,6 @@ export default class Workbench extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-        // Settings tab logic might call start/stopPolling directly now
+        // Settings changes might affect polling/retries, handled in settings tab for now
     }
 }
