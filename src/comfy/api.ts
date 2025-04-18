@@ -2,139 +2,225 @@ import { Notice, requestUrl } from 'obsidian';
 import type Workbench from '../main';
 import { updateStatusBar } from '../ui/status_bar';
 import { startPolling, stopPolling, pollStatus } from './polling';
-import type { ComfyApi } from './types';
+import { ComfyApi } from '@saintno/comfyui-sdk';
 
-export async function checkComfyConnection(pluginInstance: Workbench): Promise<boolean> {
-    // Prevent multiple simultaneous checks if already connecting/launching
-    if (pluginInstance.currentComfyStatus === 'Connecting' || pluginInstance.currentComfyStatus === 'Launching') {
-        console.log("Connection check skipped: Already connecting or launching.");
-        return false;
-    }
+export function checkComfyConnection(pluginInstance: Workbench): Promise<boolean> {
+    // Return a promise that resolves/rejects based on connection success/failure
+    return new Promise(async (resolve) => { // Removed unused 'reject' parameter
+        let connectionTimeoutId: number | null = null; // Declare here
 
-    stopPolling(pluginInstance); // Stop any existing polling
-    pluginInstance.comfyApi = null; // Reset API instance
-    const apiUrl = pluginInstance.settings.comfyApiUrl?.trim();
-
-    if (!apiUrl) {
-        new Notice('ComfyUI API URL is empty. Please configure it.');
-        console.error('ComfyUI API URL is empty');
-        updateStatusBar(pluginInstance, 'Error', 'ComfyUI API URL is empty');
-        return false;
-    }
-
-    // Validate URL format before attempting connection
-    try {
-        new URL(apiUrl);
-    } catch (e) {
-        new Notice('Invalid ComfyUI API URL format.');
-        console.error('Invalid ComfyUI API URL format:', e);
-        updateStatusBar(pluginInstance, 'Error', 'Invalid ComfyUI API URL');
-        return false;
-    }
-
-    // Reset retry count at the beginning of a connection attempt
-    pluginInstance.pollingRetryCount = 0;
-    if (pluginInstance.pollingRetryTimeoutId) {
-        clearTimeout(pluginInstance.pollingRetryTimeoutId);
-        pluginInstance.pollingRetryTimeoutId = null;
-    }
-
-    updateStatusBar(pluginInstance, 'Connecting', `Connecting to ${apiUrl}...`);
-
-    try {
-        console.log(`Attempting connection to ${apiUrl}/system_stats`);
-        const response = await requestUrl({
-            url: `${apiUrl}/system_stats`,
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            throw: false // Prevent requestUrl from throwing on non-200 status
-        });
-        console.log(`Connection attempt status: ${response.status}`);
-
-        if (response.status !== 200) {
-            // Handle non-200 responses explicitly
-            throw new Error(`Connection failed. Status: ${response.status}. Is ComfyUI running at ${apiUrl}?`);
+        // Prevent multiple simultaneous checks
+        if (pluginInstance.currentComfyStatus === 'Connecting' || pluginInstance.currentComfyStatus === 'Launching') {
+            console.log("Connection check skipped: Already connecting or launching.");
+            resolve(false); // Resolve with false as no new connection was established by this call
+            return;
         }
 
-        // --- Connection Successful ---
-        console.log('ComfyUI connection successful');
-        new Notice('Successfully connected to ComfyUI API');
-        pluginInstance.comfyApi = createComfyApiWrapper(apiUrl);
+        stopPolling(pluginInstance); // Stop any existing polling
 
-        // Reset retry count again after successful pollStatus confirms API is responsive
-        await pollStatus(pluginInstance);
-        pluginInstance.pollingRetryCount = 0; // Ensure reset after initial poll
-
-        // Start polling only if enabled and connection was successful
-        if (pluginInstance.settings.enablePolling) {
-            startPolling(pluginInstance); // startPolling also resets count
-        }
-
-        return true;
-
-    } catch (error: any) { // Catch any error during the process
-        // --- Connection Failed ---
-        const errorMessage = error.message || 'Unknown connection error';
-        new Notice(`Failed to connect to ComfyUI API: ${errorMessage}`);
-        console.error('ComfyUI connection error:', error);
-
-        pluginInstance.comfyApi = null; // Ensure API is null on failure
-        // Update status bar to Error, moving away from 'Connecting'
-        updateStatusBar(pluginInstance, 'Error', `Connection failed: ${errorMessage}`);
-        stopPolling(pluginInstance); // Ensure polling is stopped on error
-
-        return false;
-    }
-    // No finally block needed as try/catch covers success and failure paths for status updates
-}
-
-/**
- * Creates a minimal wrapper around the ComfyUI API using requestUrl.
- * @param apiUrl The base URL of the ComfyUI API.
- * @returns An object conforming to the ComfyApi interface.
- */
-function createComfyApiWrapper(apiUrl: string): ComfyApi {
-    return {
-        baseUrl: apiUrl,
-
-        async getObjectInfo() {
+        // Clean up previous SDK instance if it exists
+        if (pluginInstance.comfyApi) {
             try {
-                const response = await requestUrl({
-                    url: `${apiUrl}/object_info`,
-                    method: 'GET',
-                    headers: {'Accept': 'application/json'},
-                });
-                return response.json;
+                 // Attempt to close WebSocket if SDK provides a method
+                 if (typeof (pluginInstance.comfyApi as any).close === 'function') {
+                     (pluginInstance.comfyApi as any).close();
+                     console.log("Closed previous ComfyUI WebSocket connection.");
+                 }
             } catch (e) {
-                console.warn('Failed to fetch object info:', e);
-                return null;
+                console.warn("Error closing previous ComfyApi connection:", e);
+            } finally {
+                 pluginInstance.comfyApi = null; // Ensure it's nullified
             }
-        },
-
-        async getPromptHistory() {
-            try {
-                const response = await requestUrl({
-                    url: `${apiUrl}/history`,
-                    method: 'GET',
-                    headers: {'Accept': 'application/json'},
-                });
-                return response.json;
-            } catch (e) {
-                console.warn('Failed to fetch prompt history:', e);
-                return null;
-            }
-        },
-
-        async getQueue() {
-            // Add error handling for queue request within pollStatus or here if needed
-            const response = await requestUrl({ url: `${apiUrl}/queue`, method: 'GET', headers: {'Accept': 'application/json'} });
-            return response.json;
-        },
-
-        async getSystemStats() {
-            // Add error handling for system_stats request if needed elsewhere
-            const response = await requestUrl({ url: `${apiUrl}/system_stats`, method: 'GET', headers: {'Accept': 'application/json'} });
-            return response.json;
         }
-    };
+
+        const apiUrlString = pluginInstance.settings.comfyApiUrl?.trim();
+
+        if (!apiUrlString) {
+            new Notice('ComfyUI API URL is empty. Please configure it.');
+            console.error('ComfyUI API URL is empty');
+            updateStatusBar(pluginInstance, 'Error', 'ComfyUI API URL is empty');
+            resolve(false);
+            return;
+        }
+
+        let apiUrl: URL;
+        let wsUrl: string; // WebSocket URL
+        let httpUrl: string; // HTTP URL
+        try {
+            apiUrl = new URL(apiUrlString);
+            // Construct WebSocket URL (ws:// or wss://)
+            const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+            // Include hostname and port (if specified)
+            wsUrl = `${wsProtocol}//${apiUrl.hostname}${apiUrl.port ? ':' + apiUrl.port : ''}/ws`; // Standard /ws path
+            httpUrl = apiUrl.origin; // Use the origin (scheme + hostname + port) for HTTP calls
+
+            console.log(`Derived WebSocket URL: ${wsUrl}`);
+            console.log(`Derived HTTP URL: ${httpUrl}`); // Log the HTTP URL
+        } catch (e) {
+            new Notice('Invalid ComfyUI API URL format.');
+            console.error('Invalid ComfyUI API URL format:', e);
+            updateStatusBar(pluginInstance, 'Error', 'Invalid ComfyUI API URL');
+            resolve(false);
+            return;
+        }
+
+        // Reset retry count and timeout
+        pluginInstance.pollingRetryCount = 0;
+        // No need to clear pollingRetryTimeoutId here, stopPolling already does
+
+        updateStatusBar(pluginInstance, 'Connecting', `Connecting to ${apiUrlString}...`);
+
+        // --- Connection Logic ---
+        let initialCheckCompleted = false; // Flag to prevent race conditions and double resolution
+
+        const cleanupConnectionAttempt = () => {
+            if (connectionTimeoutId) clearTimeout(connectionTimeoutId);
+            connectionTimeoutId = null;
+            if (pluginInstance.comfyApi) {
+                // Remove listeners specific to the connection attempt
+                try {
+                    pluginInstance.comfyApi.removeEventListener('ready', onReady);
+                    pluginInstance.comfyApi.removeEventListener('error', onError);
+                    pluginInstance.comfyApi.removeEventListener('close', onClose);
+                } catch(listenerError) {
+                    console.warn("Error removing connection event listeners:", listenerError);
+                }
+            }
+        };
+
+        // Define success handler
+        const handleConnectionSuccess = async () => {
+            if (initialCheckCompleted) return; // Already handled
+            initialCheckCompleted = true;
+            cleanupConnectionAttempt();
+            console.log('ComfyUI connection successful (WebSocket ready or initial poll succeeded).');
+            new Notice('Successfully connected to ComfyUI API');
+
+            // Connection is up, now determine Ready/Busy state via pollStatus
+            try {
+                await pollStatus(pluginInstance); // Updates status bar internally
+                // If pollStatus succeeded, status is now Ready or Busy
+                pluginInstance.pollingRetryCount = 0; // Reset retries on successful connection & poll
+                if (pluginInstance.settings.enablePolling) {
+                    startPolling(pluginInstance);
+                }
+                resolve(true); // Resolve true: connection established and initial status checked
+            } catch (pollError) {
+                // pollStatus failed, status bar is likely 'Error' due to pollStatus internal logic
+                console.error("Initial status poll failed after connection was established:", pollError);
+                // Resolve true because the WebSocket connection itself succeeded,
+                // but polling will handle the error state.
+                resolve(true);
+            }
+        };
+
+        // Define failure handler
+        const handleConnectionFailure = (reason: string) => {
+            if (initialCheckCompleted) return; // Already handled
+            initialCheckCompleted = true;
+            cleanupConnectionAttempt();
+            console.error(`ComfyUI connection failed: ${reason}`);
+            new Notice(`ComfyUI connection failed: ${reason}`);
+            updateStatusBar(pluginInstance, 'Error', `Connection failed: ${reason}`);
+            // Clean up the potentially partially connected SDK instance
+            if (pluginInstance.comfyApi) {
+                 try {
+                     if (typeof (pluginInstance.comfyApi as any).close === 'function') {
+                         (pluginInstance.comfyApi as any).close();
+                     }
+                 } catch (e) { /* Ignore */ }
+                 pluginInstance.comfyApi = null;
+            }
+            resolve(false); // Resolve false: connection failed
+        };
+
+        // SDK Event Handlers
+        const onReady = async () => {
+            console.log(">>> SDK 'ready' event received!");
+            await handleConnectionSuccess();
+        };
+
+        const onError = (errorEvent: Event | Error) => {
+            console.log(">>> SDK 'error' event received!", errorEvent);
+            const errorMessage = errorEvent instanceof Error ? errorEvent.message : 'WebSocket error';
+            handleConnectionFailure(errorMessage);
+        };
+
+        const onClose = (closeEvent?: any) => {
+             console.log(">>> SDK 'close' event received!", closeEvent);
+             // Only treat 'close' as a failure if it happens *during* the initial 'Connecting' phase
+             if (!initialCheckCompleted && pluginInstance.currentComfyStatus === 'Connecting') {
+                const reason = closeEvent?.reason || 'WebSocket closed unexpectedly';
+                handleConnectionFailure(reason);
+             } else if (initialCheckCompleted && pluginInstance.currentComfyStatus !== 'Disconnected') {
+                 // Handle closures *after* successful connection (e.g., server restart)
+                 console.log("ComfyUI SDK connection closed after successful connection.");
+                 updateStatusBar(pluginInstance, 'Disconnected', 'Connection closed');
+                 pluginInstance.currentComfyStatus = 'Disconnected';
+                 pluginInstance.comfyApi = null;
+                 stopPolling(pluginInstance);
+             }
+        };
+
+        try {
+            // Step 1: Quick HTTP check
+            console.log(`Attempting initial HTTP check to ${httpUrl}/system_stats`);
+            const response = await requestUrl({
+                url: `${httpUrl}/system_stats`,
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                throw: false // Handle errors manually
+            });
+            console.log(`HTTP check status: ${response.status}`);
+            if (response.status !== 200) {
+                handleConnectionFailure(`HTTP check failed (Status: ${response.status})`);
+                return; // Exit promise execution
+            }
+
+            console.log('HTTP check successful. Initializing ComfyUI SDK instance...');
+
+            // Step 2: Instantiate SDK with HTTP URL and Add Listeners
+            pluginInstance.comfyApi = new ComfyApi(httpUrl);
+            console.log('ComfyUI SDK instance created. Adding event listeners...');
+            pluginInstance.comfyApi.addEventListener('ready', onReady);
+            pluginInstance.comfyApi.addEventListener('error', onError);
+            pluginInstance.comfyApi.addEventListener('close', onClose);
+            console.log('Event listeners added.');
+
+            // Step 3: Attempt initial poll immediately
+            console.log('Attempting initial status poll immediately after SDK setup...');
+            try {
+                // Use pollStatus. If it succeeds, connection is established.
+                await pollStatus(pluginInstance);
+                // If pollStatus didn't throw, it means the API is responsive.
+                console.log('Initial poll successful.');
+                await handleConnectionSuccess(); // Treat as successful connection
+                return; // Exit promise execution, already resolved in handleConnectionSuccess
+
+            } catch (pollError: any) {
+                 console.warn('Initial status poll failed:', pollError.message || pollError);
+                 // Update status bar to reflect the poll failure, but continue waiting for SDK events/timeout.
+                 // pollStatus itself might have set the status to Error.
+                 if (pluginInstance.currentComfyStatus !== 'Error') {
+                    updateStatusBar(pluginInstance, 'Error', `Initial poll failed`);
+                 }
+                 // Do NOT resolve or fail here. Let the WebSocket connection proceed or time out.
+                 // The SDK might still establish the 'ready' state.
+            }
+
+            // Step 4: Set connection timeout (only relevant if initial poll failed)
+            console.log('Setting connection timeout...');
+            connectionTimeoutId = window.setTimeout(() => {
+                // Check initialCheckCompleted flag to prevent race conditions
+                if (!initialCheckCompleted) {
+                     handleConnectionFailure('Connection timed out');
+                }
+            }, 30000); // 30-second timeout
+
+            console.log('Connection timeout set. Waiting for SDK events or timeout...');
+
+        } catch (error: any) { // Catch errors during HTTP check or ComfyApi instantiation
+            handleConnectionFailure(error.message || 'Unknown setup error');
+        }
+    }); // End of Promise constructor
 }

@@ -46,7 +46,12 @@ export function launchComfyUiDesktopApp(pluginInstance: Workbench): void {
         setTimeout(() => {
             // Only check connection if status is still 'Launching' (avoid race conditions)
             if (pluginInstance.currentComfyStatus === 'Launching') {
+                 // Set status to neutral before check to bypass guard in checkComfyConnection
+                 pluginInstance.currentComfyStatus = 'Disconnected'; // Or another neutral status
+                 console.log("Launch delay finished, initiating connection check..."); // Optional log
                  checkComfyConnection(pluginInstance);
+            } else {
+                 console.log("Connection check skipped: Status is no longer 'Launching'."); // Optional log
             }
         }, delayMs);
     });
@@ -110,7 +115,12 @@ export async function launchComfyUiScript(pluginInstance: Workbench): Promise<vo
         setTimeout(() => {
              // Only check connection if status is still 'Launching'
              if (pluginInstance.currentComfyStatus === 'Launching') {
+                 // Set status to neutral before check to bypass guard in checkComfyConnection
+                 pluginInstance.currentComfyStatus = 'Disconnected'; // Or another neutral status
+                 console.log("Launch delay finished, initiating connection check..."); // Optional log
                  checkComfyConnection(pluginInstance);
+             } else {
+                 console.log("Connection check skipped: Status is no longer 'Launching'."); // Optional log
              }
         }, delayMs);
 

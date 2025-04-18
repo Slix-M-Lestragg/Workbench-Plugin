@@ -4,51 +4,60 @@ A plugin for Obsidian that enhances your workflow between Obsidian and browser-b
 
 ## Purpose
 
-Workbench bridges the gap between your Obsidian vault and web-based AI tools, allowing for seamless interaction with your files directly from Obsidian. This plugin is designed to streamline your workflow when working with ComfyUI and similar applications by eliminating manual file exports and imports.
+Workbench bridges the gap between your Obsidian vault and web-based AI tools, allowing for seamless interaction with your files directly from Obsidian. This plugin is designed to streamline your workflow when working with ComfyUI by eliminating manual file exports and imports, and enabling direct workflow execution.
 
 ## Key Features
 
-- **Direct File Integration**: Load files from your Obsidian vault directly into ComfyUI workflows
-  - Images: Send vault images directly to ComfyUI as inputs
-  - Text: Use note content as prompts or parameters
-  - Audio: Process audio files in AI workflows
-  
-- **API Integration**: Configure connections to ComfyUI API endpoints
-  - Save and manage multiple endpoint configurations
-  - Test connection status directly from Obsidian
-
-- **Enhanced Workflow Management**:
-  - Load saved workflows with a single click
-  - Execute workflows directly from Obsidian
-  - Store and organize workflow results back in your vault
+- **ComfyUI Connection**: Connects to a running ComfyUI instance via its API.
+    - Status bar indicator shows connection status (Offline, Connecting, Ready, Busy, Error).
+    - Click the status bar item to attempt connection/reconnection.
+- **Workflow Execution**: Run ComfyUI workflows directly from Obsidian.
+    - Right-click on a `.json` workflow file in the Obsidian file explorer and select "Run ComfyUI Workflow".
+- **API Integration**: Configure the connection to your ComfyUI API endpoint.
+- **Polling**: Optionally polls the ComfyUI server to keep the status up-to-date.
+- **Launch Helpers (Optional)**: Commands to attempt launching ComfyUI (requires configuration).
 
 ## Installation
 
-1. In Obsidian, go to Settings → Community Plugins → Browse
-2. Search for "Workbench" and install
-3. Enable the plugin
+1.  **Install the Plugin:**
+    *   **Manual:** Download `main.js`, `manifest.json`, and `styles.css` from the latest release and place them in your vault's `.obsidian/plugins/Workbench-Plugin/` folder.
+    *   **BRAT (Recommended for updates):** Install the BRAT community plugin, add the beta repository `YourGitHubUsername/YourRepoName`, and install "Workbench" through BRAT.
+2.  **Enable the Plugin:** In Obsidian, go to Settings → Community Plugins, find "Workbench", and toggle it on.
+3.  **Configure ComfyUI for CORS:** **This is crucial for the plugin to communicate with ComfyUI.**
+    *   **If using ComfyUI Desktop:**
+        1.  Go to the Server Config settings within ComfyUI Desktop.
+        2.  Find the "Enable CORS header" option.
+        3.  Set it to allow the Obsidian origin. You can either use `*` (allows all origins, less secure) or specify `app://obsidian.md`.
+        4.  Restart ComfyUI Desktop.
+    *   **If running ComfyUI via `python main.py`:**
+        1.  Stop the ComfyUI server if it's running.
+        2.  Restart it using the `--enable-cors` flag:
+            ```bash
+            python main.py --enable-cors
+            ```
+        3.  Alternatively, if that flag doesn't work or you need more specific control, look for flags like `--cors-allowed-origins` in your ComfyUI version and use:
+            ```bash
+            python main.py --cors-allowed-origins "app://obsidian.md"
+            ```
 
 ## Configuration
 
-1. Open Settings → Workbench
-2. Configure your ComfyUI endpoint URL
-3. Set default directories for workflows and outputs
-4. Configure authentication if your ComfyUI instance requires it
+1.  Open Obsidian Settings → Workbench.
+2.  **ComfyUI API URL:** Enter the full URL of your running ComfyUI instance (e.g., `http://localhost:8188` or `http://127.0.0.1:8188`). The default ComfyUI port is often `8188`.
+3.  **Enable Polling:** Check this box if you want the plugin to periodically check the ComfyUI status (Ready/Busy). Recommended.
+4.  **(Optional) Launch Configuration:** Configure paths if you want to use the commands to *attempt* launching ComfyUI (experimental).
 
 ## Usage Examples
 
-- Right-click on an image in the file explorer and select "Send to ComfyUI"
-- Use command palette to execute a saved workflow
-- Drag files from Obsidian to active workflows in the sidebar view
-- Export workflow results directly to your vault
+- **Check Connection:** Look at the status bar item in Obsidian to see if the plugin is connected to ComfyUI.
+- **Run Workflow:** Right-click on a ComfyUI workflow `.json` file in the Obsidian file explorer and select "Run ComfyUI Workflow". A notice will appear, and the status bar will update to 'Busy' while running.
 
 ## Future Plans
 
-- Support for additional AI platforms beyond ComfyUI
-- Workflow templates and presets
-- Batch processing capabilities
-- Real-time workflow monitoring
-- Result history and version tracking
+- Send images/text from Obsidian notes to ComfyUI nodes.
+- Receive generated images/data back into Obsidian notes.
+- More robust error handling and feedback.
+- Workflow templates and presets.
 
 ## Contributing
 
