@@ -76,3 +76,138 @@
   font-size: var(--font-ui-small);
   white-space: pre;
 }
+
+/* Animation for Busy Status Icon */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.comfy-busy-icon .lucide-loader {
+  animation: spin 1s linear infinite;
+}
+
+/* Ensure icon alignment is good in status bar */
+.status-bar-item .status-bar-icon {
+    display: inline-flex; /* Helps with vertical alignment */
+    align-items: center;
+}
+
+/* --- Status Popover Styles --- */
+.wb-status-popover {
+    /* Inherits from .menu */
+    min-width: 200px; /* Can be smaller now */
+    max-width: 350px; /* Prevent getting too wide */
+    padding: var(--size-4-1) var(--size-4-2); /* Reduced padding */
+    border: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    box-shadow: var(--shadow-l);
+    z-index: var(--layer-menu);
+    font-size: var(--font-ui-smaller); /* Smaller base font */
+}
+
+/* Popover Row Layout */
+.wb-popover-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2); /* Spacing between items in a row */
+    padding: var(--size-4-1) 0; /* Reduced vertical padding */
+}
+
+/* Header Row Specifics */
+.wb-popover-header {
+    padding-bottom: var(--size-4-1);
+    margin-bottom: var(--size-4-1);
+    border-bottom: 1px solid var(--background-modifier-border);
+    font-weight: bold;
+}
+
+.wb-popover-title-label {
+    color: var(--text-muted);
+}
+
+.wb-popover-status-text {
+    flex-grow: 1; /* Take remaining space */
+    text-align: right;
+    /* Add status-specific colors */
+}
+.wb-status-ready { color: var(--color-green); }
+.wb-status-busy { color: var(--color-yellow); }
+.wb-status-error { color: var(--color-red); }
+.wb-status-connecting, .wb-status-launching { color: var(--color-blue); }
+.wb-status-disconnected { color: var(--text-muted); }
+
+
+.wb-popover-header-button .button {
+    height: auto; /* Adjust button height */
+    line-height: 1;
+    padding: var(--size-4-1) var(--size-4-2); /* Smaller button padding */
+    font-size: var(--font-ui-smaller);
+    margin-left: var(--size-4-2); /* Space before button */
+}
+
+/* Sections */
+.wb-popover-section {
+    margin-top: var(--size-4-1);
+    padding-top: var(--size-4-1);
+    border-top: 1px solid var(--background-modifier-border-hover);
+}
+.wb-popover-section:first-of-type { /* Header is not a section */
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+/* Stats Styling */
+.wb-stat-label {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.wb-stat-value {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.wb-stat-spacer {
+    flex-grow: 1; /* Pushes elements apart in the row */
+    min-width: var(--size-4-2); /* Ensure some minimum space */
+}
+
+/* GPU row specific styles applied when needed */
+/* .wb-gpu-row .wb-stat-label,
+.wb-gpu-row .wb-stat-value {
+    font-size: calc(var(--font-ui-smaller) * 0.95);
+} */
+
+.wb-prompt-id {
+    font-family: var(--font-monospace);
+    color: var(--text-accent);
+}
+
+
+/* Remove old title/setting styles if no longer needed */
+.wb-popover-title, /* Replaced by header row */
+.wb-popover-section h5,
+.wb-popover-section h6,
+.wb-popover-setting,
+.wb-popover-setting-compact,
+.wb-gpu-stats /* Replaced by row layout */
+{
+    display: none; /* Hide old elements */
+}
+
+/* Keep text utility classes */
+.wb-loading-text,
+.wb-muted-text,
+.wb-error-text {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    padding: var(--size-4-1) 0;
+    width: 100%; /* Ensure they take full width if needed */
+    text-align: center; /* Center loading/error messages */
+}
+
+.wb-error-text {
+    color: var(--text-error);
+}

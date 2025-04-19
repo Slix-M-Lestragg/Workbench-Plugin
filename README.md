@@ -9,10 +9,12 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
 ## Key Features
 
 - **ComfyUI Connection**: Connects to a running ComfyUI instance via its API.
-    - Status bar indicator shows connection status (Offline, Connecting, Ready, Busy, Error).
-    - Click the status bar item to attempt connection/reconnection.
+    - Status bar indicator shows connection status (Offline, Connecting, Ready, Busy, Error) with an animated icon for 'Busy'.
+    - Click the status bar item to open a popover showing detailed status, system stats (CPU, RAM, GPU), queue info, and a connection check button.
 - **Workflow Execution**: Run ComfyUI workflows directly from Obsidian.
     - Right-click on a `.json` workflow file in the Obsidian file explorer and select "Run ComfyUI Workflow".
+- **Copy Workflow & Open**: Quickly copy a workflow and open ComfyUI.
+    - Right-click on a `.json` workflow file and select "Copy Workflow & Open ComfyUI" to copy the workflow JSON to your clipboard and open your ComfyUI instance in a new browser tab.
 - **Custom JSON Viewer**: Provides a dedicated view for `.json` files within Obsidian.
     - Displays JSON files with syntax highlighting.
     - Uses a custom icon in the Obsidian interface for JSON files associated with this view.
@@ -60,8 +62,9 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
 
 ## Usage Examples
 
-- **Check Connection:** Look at the status bar item in Obsidian to see if the plugin is connected to ComfyUI.
+- **Check Connection & Status:** Click the status bar item in Obsidian to open the status popover. This shows the current connection status, system resource usage (CPU, RAM, GPU), and the ComfyUI queue details. If disconnected, you can click the "Check" button in the popover to attempt connection.
 - **Run Workflow:** Right-click on a ComfyUI workflow `.json` file in the Obsidian file explorer and select "Run ComfyUI Workflow". A notice will appear, and the status bar will update to 'Busy' while running.
+- **Copy Workflow to ComfyUI:** Right-click on a workflow `.json` file and select "Copy Workflow & Open ComfyUI". Paste the workflow (Ctrl/Cmd+V) into the ComfyUI interface that opens.
 - **View JSON:** Simply click on any `.json` file in the Obsidian file explorer. It will open in the custom JSON viewer, displaying the content with syntax highlighting and the custom icon in the tab header.
 
 ## Future Plans

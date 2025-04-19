@@ -3,6 +3,7 @@ import type Workbench from '../main';
 import { updateStatusBar } from '../ui/status_bar';
 import { startPolling, stopPolling, pollStatus } from './polling';
 import { ComfyApi } from '@saintno/comfyui-sdk';
+import type { SystemStats, QueueInfo } from './types'; // Import the types
 
 export function checkComfyConnection(pluginInstance: Workbench): Promise<boolean> {
     // Return a promise that resolves/rejects based on connection success/failure
@@ -223,4 +224,60 @@ export function checkComfyConnection(pluginInstance: Workbench): Promise<boolean
             handleConnectionFailure(error.message || 'Unknown setup error');
         }
     }); // End of Promise constructor
+}
+
+/**
+ * Fetches system stats from the ComfyUI API.
+ * @param pluginInstance The instance of the Workbench plugin.
+ * @returns A promise resolving to SystemStats or null if failed.
+ */
+export async function fetchSystemStats(pluginInstance: Workbench): Promise<SystemStats | null> {
+    if (!pluginInstance.comfyApi) {
+        console.warn("fetchSystemStats called but comfyApi is not initialized.");
+        return null;
+    }
+    try {
+        // Assuming the SDK has a method getSystemStats()
+        // If not, you might need to use requestUrl directly:
+        // const response = await requestUrl({ url: `${pluginInstance.settings.comfyApiUrl}/system_stats`, method: 'GET' });
+        // if (response.status === 200) return response.json as SystemStats;
+        // else throw new Error(`Failed to fetch system stats: ${response.status}`);
+
+        const stats = await pluginInstance.comfyApi.getSystemStats();
+        return stats as SystemStats; // Cast or validate the response structure
+    } catch (error) {
+        console.error("Error fetching system stats:", error);
+        // Optionally update status bar or show notice on specific errors
+        return null;
+    }
+}
+
+/**
+ * Fetches queue information from the ComfyUI API.
+ * @param pluginInstance The instance of the Workbench plugin.
+ * @returns A promise resolving to QueueInfo or null if failed.
+ */
+export async function fetchQueueInfo(pluginInstance: Workbench): Promise<QueueInfo | null> {
+    if (!pluginInstance.comfyApi) {
+        console.warn("fetchQueueInfo called but comfyApi is not initialized.");
+        return null;
+    }
+    try {
+        // Assuming the SDK has a method getQueue()
+        // If not, use requestUrl:
+        // const response = await requestUrl({ url: `${pluginInstance.settings.comfyApiUrl}/queue`, method: 'GET' });
+        // if (response.status === 200) return response.json as QueueInfo;
+        // else throw new Error(`Failed to fetch queue info: ${response.status}`);
+
+        const queueData = await pluginInstance.comfyApi.getQueue();
+        // The SDK might return a different structure, adapt as needed.
+        // Example structure assumed here based on modal usage:
+        return {
+            queue_running: queueData.queue_running || [],
+            queue_pending: queueData.queue_pending || []
+        } as QueueInfo;
+    } catch (error) {
+        console.error("Error fetching queue info:", error);
+        return null;
+    }
 }

@@ -1,9 +1,10 @@
 import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App } from 'obsidian'; // Added App
 import { WorkbenchSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
-import { ComfyStatus } from './comfy/types';
+import { ComfyStatus, SystemStats, QueueInfo } from './comfy/types'; // Import new types
 import { ComfyApi } from '@saintno/comfyui-sdk';
 import { setupStatusBar, updateStatusBar } from './ui/status_bar';
-import { checkComfyConnection } from './comfy/api';
+// Assuming api.ts will export functions to fetch stats and queue
+import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api';
 import { startPolling, stopPolling } from './comfy/polling';
 import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch';
 import { registerCommands } from './commands';
@@ -33,6 +34,34 @@ export default class Workbench extends Plugin {
     public checkComfyConnection = () => checkComfyConnection(this);
     public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file); // Expose the execution method
 
+    // --- Methods for Status Modal ---
+    public async getSystemStats(): Promise<SystemStats | null> {
+        if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
+            console.log("Cannot fetch system stats, ComfyUI not connected.");
+            return null;
+        }
+        try {
+            // Call the actual API fetching logic (to be implemented in api.ts)
+            return await fetchSystemStats(this);
+        } catch (error) {
+            console.error("Error fetching system stats from main:", error);
+            return null;
+        }
+    }
+
+    public async getQueueInfo(): Promise<QueueInfo | null> {
+        if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
+            console.log("Cannot fetch queue info, ComfyUI not connected.");
+            return null;
+        }
+        try {
+            // Call the actual API fetching logic (to be implemented in api.ts)
+            return await fetchQueueInfo(this);
+        } catch (error) {
+            console.error("Error fetching queue info from main:", error);
+            return null;
+        }
+    }
 
     /* Lifecycle Methods */
     async onload() {

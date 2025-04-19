@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 import type Workbench from '../main'; // Use 'type' for import as it's only used for type annotations
 import type { ComfyStatus } from '../comfy/types';
+import { showStatusPopover } from './StatusBarPopover'; // Import the new popover function
 
 /**
  * Updates the plugin's status bar item.
@@ -12,14 +13,9 @@ export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, 
     const { statusBarItemEl } = pluginInstance;
     if (!statusBarItemEl) return;
 
-    // Avoid unnecessary updates (optional optimization)
-    // if (status === pluginInstance.currentComfyStatus && statusBarItemEl.ariaLabel === tooltip) {
-    //     return;
-    // }
-
     pluginInstance.currentComfyStatus = status; // Update the status on the plugin instance
     let icon = 'plug-zap';
-    let text = 'ComfyUI: ';
+    let text = 'ComfyUI: '; // Keep text for tooltip generation
 
     switch (status) {
         case 'Disconnected': icon = 'plug-zap'; text += 'Offline'; break;
@@ -33,8 +29,19 @@ export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, 
     statusBarItemEl.empty();
     const iconEl = statusBarItemEl.createSpan({ cls: 'status-bar-icon' });
     setIcon(iconEl, icon);
-    statusBarItemEl.createSpan({ text: ` ${text}` });
-    statusBarItemEl.ariaLabel = tooltip || `ComfyUI Status: ${status}`;
+
+    // Add animation class if busy
+    if (status === 'Busy') {
+        iconEl.addClass('comfy-busy-icon');
+    } else {
+        iconEl.removeClass('comfy-busy-icon'); // Ensure class is removed for other states
+    }
+
+    // Remove the text span creation
+    // statusBarItemEl.createSpan({ text: ` ${text}` });
+
+    // Use the full text for the tooltip
+    statusBarItemEl.ariaLabel = tooltip || text;
 }
 
 /**
@@ -43,13 +50,10 @@ export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, 
  */
 export function setupStatusBar(pluginInstance: Workbench): void {
     pluginInstance.statusBarItemEl = pluginInstance.addStatusBarItem();
-    updateStatusBar(pluginInstance, 'Disconnected', 'Click to check connection'); // Use the imported function
-    pluginInstance.statusBarItemEl.onClickEvent(async () => {
-        // Don't connect if already connecting or launching
-        if (pluginInstance.currentComfyStatus !== 'Connecting' && pluginInstance.currentComfyStatus !== 'Launching') {
-            // Need to import and call checkComfyConnection from api.ts
-            // Assuming checkComfyConnection is imported into main.ts and available on pluginInstance or imported directly here
-            await pluginInstance.checkComfyConnection(); // We'll adjust main.ts later
-        }
+    // Initial tooltip reflects the action
+    updateStatusBar(pluginInstance, 'Disconnected', 'ComfyUI: Offline. Click for status & options.'); // Keep tooltip
+    pluginInstance.statusBarItemEl.onClickEvent((event) => { // Keep event for stopPropagation
+        // Pass the status bar element itself for positioning
+        showStatusPopover(pluginInstance, event, pluginInstance.statusBarItemEl || undefined);
     });
 }
