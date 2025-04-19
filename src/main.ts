@@ -1,4 +1,4 @@
-import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon } from 'obsidian'; // Added WorkspaceLeaf and addIcon
+import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App } from 'obsidian'; // Added App
 import { WorkbenchSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
 import { ComfyStatus } from './comfy/types';
 import { ComfyApi } from '@saintno/comfyui-sdk';
@@ -19,6 +19,7 @@ export default class Workbench extends Plugin {
     pollingIntervalId: number | null = null;
     pollingRetryCount: number = 0;
     pollingRetryTimeoutId: number | null = null;
+    app: App; // Ensure app is accessible if not already
 
     // --- Public methods for modules ---
     // Expose methods needed by other modules
@@ -30,10 +31,12 @@ export default class Workbench extends Plugin {
     // pollStatus is primarily used internally by polling.ts and api.ts
     // Make checkComfyConnection public if commands need to trigger it directly
     public checkComfyConnection = () => checkComfyConnection(this);
+    public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file); // Expose the execution method
 
 
     /* Lifecycle Methods */
     async onload() {
+        this.app = this.app; // Ensure app is assigned if needed elsewhere, Obsidian usually handles this
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
@@ -57,14 +60,10 @@ export default class Workbench extends Plugin {
         this.registerEvent(
             this.app.workspace.on('file-menu', (menu: Menu, file) => {
                 if (file instanceof TFile && file.extension === 'json') {
-                    // Check if the file might be a ComfyUI workflow
-                    // This is a basic check; a more robust check might involve reading content
-                    // For now, we add the item if it's a JSON file.
-                    this.addWorkflowMenuItem(menu, file);
-
-                    // Optional: Prevent default Obsidian opening if needed, though
-                    // registerExtensions should handle opening in our view.
-                    // menu.removeItem('open'); // Example if needed
+                    // Add the "Copy Workflow & Open ComfyUI" menu item
+                    this.addCopyAndOpenComfyMenuItem(menu, file); // Renamed function
+                    // Add the "Run Workflow" menu item (conditionally)
+                    this.addRunWorkflowMenuItem(menu, file);
                 }
             })
         );
@@ -97,38 +96,92 @@ export default class Workbench extends Plugin {
         }, 1500);
     }
 
-    // Helper function to add the menu item
-    addWorkflowMenuItem(menu: Menu, file: TFile) {
-        menu.addItem((item) => {
-            item
-                .setTitle("Run ComfyUI Workflow")
-                .setIcon("play-circle")
-                .onClick(async () => {
-                    if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
-                        new Notice('ComfyUI is not connected or ready. Please check connection.');
-                        // Optionally trigger a connection check here?
-                        // await this.checkComfyConnection();
-                        return;
-                    }
-                    try {
-                        new Notice(`Loading workflow: ${file.name}`);
-                        const workflowJson = await this.app.vault.read(file);
-                        const workflowData = JSON.parse(workflowJson);
+    // Helper function to add the "Copy Workflow & Open ComfyUI" menu item
+    addCopyAndOpenComfyMenuItem(menu: Menu, file: TFile) { // Renamed function
+        const apiUrlString = this.settings.comfyApiUrl?.trim();
+        if (apiUrlString) {
+            menu.addItem((item) => {
+                item
+                    .setTitle("Copy Workflow & Open ComfyUI") // Updated title
+                    .setIcon("copy-plus") // Changed icon to reflect copy action
+                    .onClick(async () => { // Make async to read file
+                        if (this.settings.comfyApiUrl) {
+                            try {
+                                // 1. Read the workflow file content
+                                const workflowJson = await this.app.vault.read(file);
 
-                        console.log(`Running workflow from file: ${file.path}`);
-                        updateStatusBar(this, 'Busy', `Running workflow: ${file.name}`); // Update status
-                        await runWorkflow(this, workflowData);
-                        // Assuming runWorkflow doesn't update status on completion,
-                        // pollStatus will eventually correct it, or update manually:
-                        // updateStatusBar(this, 'Ready', 'Workflow finished.');
+                                // 2. Copy to clipboard
+                                await navigator.clipboard.writeText(workflowJson);
 
-                    } catch (error) {
-                        console.error(`Error running workflow from ${file.path}:`, error);
-                        new Notice(`Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
-                        updateStatusBar(this, 'Error', 'Workflow execution failed.');
-                    }
-                });
-        });
+                                // 3. Open the base ComfyUI URL in a new tab
+                                window.open(this.settings.comfyApiUrl, '_blank');
+
+                                // 4. Notify user
+                                new Notice(`Workflow '${file.name}' copied! Paste it into ComfyUI (Cmd/Ctrl+V).`);
+
+                            } catch (error) {
+                                console.error("Error copying workflow or opening ComfyUI:", error);
+                                new Notice(`Failed to copy workflow: ${error instanceof Error ? error.message : String(error)}`);
+                            }
+                        } else {
+                            new Notice("ComfyUI API URL is not set in settings.");
+                        }
+                    });
+            });
+        }
+    }
+
+
+    // Renamed the original function to clarify its purpose
+    addRunWorkflowMenuItem(menu: Menu, file: TFile) {
+        // Only add the "Run" option if ComfyUI is Ready or Busy
+        if (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy') {
+            menu.addItem((item) => {
+                item
+                    .setTitle("Run ComfyUI Workflow")
+                    .setIcon("play-circle") // Keep the play icon for execution
+                    .onClick(async () => {
+                        // Call the execution method
+                        await this.executeWorkflowFromFile(file);
+                    });
+            });
+        } else if (this.currentComfyStatus !== 'Disconnected' && this.currentComfyStatus !== 'Error') {
+            // Add a disabled "Run" option if connecting/launching
+             menu.addItem((item) => {
+                item
+                    .setTitle("Run ComfyUI Workflow (ComfyUI not ready)")
+                    .setIcon("play-circle")
+                    .setDisabled(true);
+             });
+        }
+    }
+
+    // Method to execute a workflow from a file (used by command and Run menu item)
+    async executeWorkflowFromFile(file: TFile) {
+        if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
+            new Notice('ComfyUI is not connected or ready. Please check connection.');
+            // Optionally trigger a connection check here?
+            // await this.checkComfyConnection();
+            return;
+        }
+        try {
+            new Notice(`Loading workflow: ${file.name}`);
+            const workflowJson = await this.app.vault.read(file);
+            const workflowData = JSON.parse(workflowJson);
+
+            console.log(`Running workflow from file: ${file.path}`);
+            updateStatusBar(this, 'Busy', `Running workflow: ${file.name}`); // Update status
+            await runWorkflow(this, workflowData);
+            // Assuming runWorkflow doesn't update status on completion,
+            // pollStatus will eventually correct it, or update manually if needed.
+            // Consider adding a success notice here if runWorkflow doesn't provide one.
+            // new Notice(`Workflow ${file.name} execution started.`);
+
+        } catch (error) {
+            console.error(`Error running workflow from ${file.path}:`, error);
+            new Notice(`Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
+            updateStatusBar(this, 'Error', 'Workflow execution failed.');
+        }
     }
 
 
