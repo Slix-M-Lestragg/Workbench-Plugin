@@ -1,34 +1,31 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type Workbench from './main';
 
+// Define the possible installation types
+export type ComfyInstallType = 'script' | 'portable' | 'desktop';
+
 export interface WorkbenchSettings {
     comfyApiUrl: string;
     comfyUiPath: string;
-    comfyLaunchFile: {
-        windows: string;
-        mac: string;
-    };
+    comfyInstallType: ComfyInstallType; // <-- Add this
     enablePolling: boolean;
     pollingIntervalSeconds: number;
     launchCheckDelaySeconds: number;
-    enablePollingRetry: boolean; // <-- Add this
-    pollingRetryAttempts: number; // <-- Add this
-    pollingRetryDelaySeconds: number; // <-- Add this
+    enablePollingRetry: boolean;
+    pollingRetryAttempts: number;
+    pollingRetryDelaySeconds: number;
 }
 
 export const DEFAULT_SETTINGS: WorkbenchSettings = {
     comfyApiUrl: 'http://127.0.0.1:8188',
     comfyUiPath: '',
-    comfyLaunchFile: {
-        windows: 'run_nvidia_gpu.bat',
-        mac: 'run_mac.sh'
-    },
+    comfyInstallType: 'script', // <-- Add default
     enablePolling: true,
     pollingIntervalSeconds: 5,
     launchCheckDelaySeconds: 5,
-    enablePollingRetry: true, // <-- Add default
-    pollingRetryAttempts: 3, // <-- Add default
-    pollingRetryDelaySeconds: 10, // <-- Add default
+    enablePollingRetry: true,
+    pollingRetryAttempts: 3,
+    pollingRetryDelaySeconds: 10,
 }
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -124,41 +121,31 @@ export class SampleSettingTab extends PluginSettingTab {
 
         // --- Populate Launch Tab ---
         const launchTabContent = tabs.launch.contentEl;
-        // Platform-specific launch file setting
-        const platform = window.navigator.platform.toLowerCase();
-        if (platform.includes('win')) {
-            new Setting(launchTabContent)
-                .setName('Windows Launch File')
-                .setDesc('Name of the batch file to launch ComfyUI (relative to base directory)')
-                .addText(text => text
-                    .setPlaceholder('run_nvidia_gpu.bat') // Example placeholder
-                    .setValue(this.plugin.settings.comfyLaunchFile.windows)
-                    .onChange(async (value) => {
-                        this.plugin.settings.comfyLaunchFile.windows = value;
-                        await this.plugin.saveSettings();
-                    }));
-        } else { // Assume Mac or Linux-like default
-            new Setting(launchTabContent)
-                .setName('Mac/Linux Launch File')
-                .setDesc('Name of the shell script to launch ComfyUI (relative to base directory)')
-                .addText(text => text
-                    .setPlaceholder('run_mac.sh') // Example placeholder
-                    .setValue(this.plugin.settings.comfyLaunchFile.mac)
-                    .onChange(async (value) => {
-                        this.plugin.settings.comfyLaunchFile.mac = value;
-                        await this.plugin.saveSettings();
-                    }));
-        }
+
+        // Setting for Installation Type
+        new Setting(launchTabContent)
+            .setName('ComfyUI Installation Type')
+            .setDesc('Select how your ComfyUI is installed.')
+            .addDropdown(dropdown => dropdown
+                .addOption('script', 'Script-based (Requires run_*.bat or run_*.sh)')
+                .addOption('portable', 'Portable Version (Uses standard portable structure)')
+                .addOption('desktop', 'Desktop Application (Experimental - Launch may vary)')
+                .setValue(this.plugin.settings.comfyInstallType)
+                .onChange(async (value: ComfyInstallType) => {
+                    this.plugin.settings.comfyInstallType = value;
+                    await this.plugin.saveSettings();
+                    // Optionally re-render parts of the UI if needed based on type
+                    // this.display(); // Avoid full re-render if possible
+                }));
 
         new Setting(launchTabContent)
             .setName('Launch ComfyUI')
-            .setDesc('Start ComfyUI using the configured script')
+            .setDesc('Start ComfyUI based on the selected installation type.')
             .addButton(button => button
-                .setButtonText('Launch Script')
+                .setButtonText('Launch ComfyUI') // Changed text slightly
                 .setCta()
                 .onClick(() => {
-                    // Call the method on the plugin instance
-                    this.plugin.launchComfyUiScript();
+                    this.plugin.launchComfyUI();
                 }));
 
         // Add setting for launch delay

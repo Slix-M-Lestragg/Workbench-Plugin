@@ -1,5 +1,5 @@
 import type Workbench from './main';
-import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch'; // Import launch functions
+import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
 import { Notice, TFile } from 'obsidian'; // Import TFile
 
 /**
@@ -29,7 +29,7 @@ export function registerCommands(pluginInstance: Workbench): void {
         id: 'launch-comfyui-script',
         name: 'Launch ComfyUI Script',
         callback: () => {
-            launchComfyUiScript(pluginInstance);
+            launchComfyUI(pluginInstance);
         },
     });
 
@@ -70,6 +70,6 @@ export function registerCommands(pluginInstance: Workbench): void {
 
     // Add Ribbon Icon action here as well if it primarily triggers a command-like action
     pluginInstance.addRibbonIcon('image', 'Launch ComfyUI Script', (evt: MouseEvent) => {
-        launchComfyUiScript(pluginInstance);
+        launchComfyUI(pluginInstance);
     });
 }

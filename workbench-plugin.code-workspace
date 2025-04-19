@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "K:/programs/ComfyUI"
+		},
+		{
+			"path": "../../../../../00-RnD/ComfyUI_windows_portable"
 		}
 	],
 	"settings": {}

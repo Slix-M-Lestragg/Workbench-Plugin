@@ -6,7 +6,7 @@ import { setupStatusBar, updateStatusBar } from './ui/status_bar';
 // Assuming api.ts will export functions to fetch stats and queue
 import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api';
 import { startPolling, stopPolling } from './comfy/polling';
-import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch';
+import { launchComfyUI } from './comfy/launch'; // <-- Import the new unified launch function
 import { registerCommands } from './commands';
 import { runWorkflow } from './comfy/generation';
 import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // <-- Import JsonView
@@ -36,11 +36,7 @@ export default class Workbench extends Plugin {
     // Expose methods needed by other modules
     public startPolling = () => startPolling(this);
     public stopPolling = () => stopPolling(this);
-    public launchComfyUiScript = () => launchComfyUiScript(this);
-    public launchComfyUiDesktopApp = () => launchComfyUiDesktopApp(this);
-    // checkComfyConnection is called internally or via status bar click
-    // pollStatus is primarily used internally by polling.ts and api.ts
-    // Make checkComfyConnection public if commands need to trigger it directly
+    public launchComfyUI = () => launchComfyUI(this); // <-- Add the new unified launch method
     public checkComfyConnection = () => checkComfyConnection(this);
     public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file); // Expose the execution method
 
@@ -133,7 +129,7 @@ export default class Workbench extends Plugin {
                      this.startPolling();
                  }
             }
-        }, 1500);
+        }, 5000); // <-- Increased delay to 5 seconds (5000ms)
     }
 
     // Helper function to add the "Copy Workflow & Open ComfyUI" menu item
