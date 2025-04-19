@@ -1,13 +1,15 @@
-import { Plugin, TFile, Menu, Notice } from 'obsidian';
+import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon } from 'obsidian'; // Added WorkspaceLeaf and addIcon
 import { WorkbenchSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
 import { ComfyStatus } from './comfy/types';
 import { ComfyApi } from '@saintno/comfyui-sdk';
 import { setupStatusBar, updateStatusBar } from './ui/status_bar';
 import { checkComfyConnection } from './comfy/api';
-import { startPolling, stopPolling, pollStatus } from './comfy/polling'; // Keep pollStatus import if needed elsewhere
+import { startPolling, stopPolling } from './comfy/polling';
 import { launchComfyUiDesktopApp, launchComfyUiScript } from './comfy/launch';
 import { registerCommands } from './commands';
 import { runWorkflow } from './comfy/generation';
+import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // <-- Import JsonView
+import { JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG } from './ui/icons'; // <-- Import icon constants
 
 export default class Workbench extends Plugin {
     settings: WorkbenchSettings;
@@ -35,15 +37,34 @@ export default class Workbench extends Plugin {
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
+        // --- Register Custom JSON Icon ---
+        addIcon(JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG);
+        console.log("Registered custom JSON icon.");
+
         setupStatusBar(this); // Sets up the status bar element and click handler
         registerCommands(this);
+
+        // --- Register JSON View ---
+        this.registerView(
+            JSON_VIEW_TYPE,
+            (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf) // Pass app instance
+            // Icon is set in the JsonView class via getIcon()
+        );
+        this.registerExtensions(["json"], JSON_VIEW_TYPE);
+        console.log(`Registered JSON view for '.json' files.`);
 
         // --- Register File Menu Event Handler ---
         this.registerEvent(
             this.app.workspace.on('file-menu', (menu: Menu, file) => {
                 if (file instanceof TFile && file.extension === 'json') {
-                    // Basic check: Add for any JSON file
+                    // Check if the file might be a ComfyUI workflow
+                    // This is a basic check; a more robust check might involve reading content
+                    // For now, we add the item if it's a JSON file.
                     this.addWorkflowMenuItem(menu, file);
+
+                    // Optional: Prevent default Obsidian opening if needed, though
+                    // registerExtensions should handle opening in our view.
+                    // menu.removeItem('open'); // Example if needed
                 }
             })
         );

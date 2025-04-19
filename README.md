@@ -13,9 +13,13 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
     - Click the status bar item to attempt connection/reconnection.
 - **Workflow Execution**: Run ComfyUI workflows directly from Obsidian.
     - Right-click on a `.json` workflow file in the Obsidian file explorer and select "Run ComfyUI Workflow".
+- **Custom JSON Viewer**: Provides a dedicated view for `.json` files within Obsidian.
+    - Displays JSON files with syntax highlighting.
+    - Uses a custom icon in the Obsidian interface for JSON files associated with this view.
 - **API Integration**: Configure the connection to your ComfyUI API endpoint.
 - **Polling**: Optionally polls the ComfyUI server to keep the status up-to-date.
 - **Launch Helpers (Optional)**: Commands to attempt launching ComfyUI (requires configuration).
+- **Tabbed Settings**: Organizes plugin settings into clear tabs (General, Launch, Polling).
 
 ## Installation
 
@@ -43,14 +47,22 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
 ## Configuration
 
 1.  Open Obsidian Settings → Workbench.
-2.  **ComfyUI API URL:** Enter the full URL of your running ComfyUI instance (e.g., `http://localhost:8188` or `http://127.0.0.1:8188`). The default ComfyUI port is often `8188`.
-3.  **Enable Polling:** Check this box if you want the plugin to periodically check the ComfyUI status (Ready/Busy). Recommended.
-4.  **(Optional) Launch Configuration:** Configure paths if you want to use the commands to *attempt* launching ComfyUI (experimental).
+2.  **General Tab**:
+    *   **ComfyUI Base Directory:** Path to your main ComfyUI installation folder.
+    *   **ComfyUI API URL:** Enter the full URL of your running ComfyUI instance (e.g., `http://localhost:8188`).
+3.  **Launch Tab**:
+    *   Configure the script/batch file used to launch ComfyUI (platform-specific).
+    *   Set the delay before checking the connection after launch.
+4.  **Polling Tab**:
+    *   **Enable Polling:** Check this box if you want the plugin to periodically check the ComfyUI status (Ready/Busy). Recommended.
+    *   Configure polling interval and retry behavior on errors.
+5.  **(Optional) Launch Configuration:** Configure paths if you want to use the commands to *attempt* launching ComfyUI (experimental).
 
 ## Usage Examples
 
 - **Check Connection:** Look at the status bar item in Obsidian to see if the plugin is connected to ComfyUI.
 - **Run Workflow:** Right-click on a ComfyUI workflow `.json` file in the Obsidian file explorer and select "Run ComfyUI Workflow". A notice will appear, and the status bar will update to 'Busy' while running.
+- **View JSON:** Simply click on any `.json` file in the Obsidian file explorer. It will open in the custom JSON viewer, displaying the content with syntax highlighting and the custom icon in the tab header.
 
 ## Future Plans
 

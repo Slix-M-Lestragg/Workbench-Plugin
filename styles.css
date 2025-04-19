@@ -1,8 +1,78 @@
-/*
+/* Add styles for settings tabs */
+.wb-settings-tab-header-container {
+  display: flex;
+  width: 100%;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: var(--size-4-4); /* Add some space below tabs */
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.wb-settings-tab-header {
+  flex-grow: 1; /* Make tabs fill the width */
+  padding: var(--size-4-2) var(--size-4-4);
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2px solid transparent; /* Placeholder for active indicator */
+  margin-bottom: -1px; /* Overlap container border */
+  transition: border-color 0.1s ease-in-out, color 0.1s ease-in-out;
+}
 
-If your plugin does not need CSS, delete this file.
+.wb-settings-tab-header:hover {
+  color: var(--text-normal); /* Slightly highlight on hover */
+}
 
-*/
+.wb-settings-tab-header.wb-active {
+  color: var(--text-accent);
+  border-bottom-color: var(--interactive-accent); /* Active tab indicator */
+}
+
+.wb-settings-tab-content {
+  /* Styles for content panes if needed, e.g., padding */
+  padding-top: var(--size-4-2);
+}
+
+/* Hide inactive content panes by default (handled by JS adding/removing wb-active and display style) */
+/* .wb-settings-tab-content:not(.wb-active) { */
+  /* display: none; */ /* JS now handles show/hide directly */
+/* } */
+
+/* Styles for JSON Viewer */
+.json-view-container {
+  height: 100%;
+  overflow: auto; /* Allow scrolling for large JSON */
+  padding: var(--size-4-4); /* Add padding to the container */
+}
+
+/* Style the code block rendered by MarkdownRenderer */
+.json-view-container .markdown-rendered pre > code.language-json {
+  /* Obsidian's default code block styling might be sufficient */
+  /* You can add overrides here if needed */
+  font-size: var(--font-ui-small); /* Example: Ensure consistent font size */
+  white-space: pre; /* Ensure whitespace is preserved */
+}
+
+/* Remove default pre margin if Obsidian adds it */
+.json-view-container .markdown-rendered pre {
+   margin: 0;
+   /* Consider setting background if needed, though theme should handle it */
+   /* background-color: var(--code-background); */
+}
+
+
+.json-view-error {
+  color: var(--text-error);
+  /* padding: var(--size-4-4); /* Padding now on container */
+  font-weight: bold;
+  margin-bottom: var(--size-4-2); /* Space between error and raw code */
+}
+
+/* Style the fallback raw code block */
+.json-view-container > pre {
+    margin-top: var(--size-4-2);
+}
+
+.json-view-container > pre > code {
+  color: var(--text-muted); /* Dim the raw code if there was an error */
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  white-space: pre;
+}
