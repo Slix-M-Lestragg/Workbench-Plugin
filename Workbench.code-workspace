@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../.."
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "node_modules/@saintno/comfyui-sdk"
+		}
+	],
+	"settings": {}
+}

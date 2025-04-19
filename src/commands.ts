@@ -16,6 +16,16 @@ export function registerCommands(pluginInstance: Workbench): void {
     });
 
     pluginInstance.addCommand({
+        id: 'log-comfyui-state',
+        name: 'Log ComfyUI State to Console',
+        callback: () => {
+            console.log('Current ComfyUI Status:', pluginInstance.currentComfyStatus);
+            console.log('ComfyUI API State:', pluginInstance.comfyApi);
+            new Notice('ComfyUI state logged to console');
+        },
+    });
+
+    pluginInstance.addCommand({
         id: 'launch-comfyui-script',
         name: 'Launch ComfyUI Script',
         callback: () => {

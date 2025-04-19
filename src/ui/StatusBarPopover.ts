@@ -139,6 +139,26 @@ async function renderPopoverContent(containerEl: HTMLElement, plugin: Workbench)
         });
     }
 
+    // --- Progress Bar (if running) ---
+    console.log('Current plugin state:', plugin);
+    const progressValue = plugin.currentProgressValue;
+    const progressMax = plugin.currentProgressMax;
+    const runningPromptId = plugin.currentRunningPromptId;
+
+    if (runningPromptId && progressValue !== null && progressMax !== null && progressMax > 0) {
+        const progressContainer = containerEl.createDiv({ cls: 'wb-popover-section wb-progress-section' });
+        const progressRow = progressContainer.createDiv({ cls: 'wb-popover-row' });
+        progressRow.createSpan({ cls: 'wb-stat-label', text: `Run #${runningPromptId}:` }); // Show prompt ID
+
+        const progressBarEl = progressRow.createEl('progress', { cls: 'wb-progress-bar' });
+        progressBarEl.value = progressValue;
+        progressBarEl.max = progressMax;
+
+        const progressText = progressRow.createSpan({ cls: 'wb-stat-value wb-progress-text' });
+        progressText.textContent = `${progressValue} / ${progressMax}`;
+    }
+
+
     // --- System Stats ---
     const statsContainer = containerEl.createDiv({ cls: 'wb-popover-section wb-stats-section' });
     const statsLoadingEl = statsContainer.createEl('div', { text: 'Loading Stats...', cls: 'wb-loading-text' });
@@ -151,7 +171,8 @@ async function renderPopoverContent(containerEl: HTMLElement, plugin: Workbench)
             // CPU & RAM Row
             const cpuRamRow = statsContainer.createDiv({ cls: 'wb-popover-row' });
             cpuRamRow.createSpan({ cls: 'wb-stat-label', text: 'CPU:' });
-            cpuRamRow.createSpan({ cls: 'wb-stat-value', text: `${stats.cpu_utilization?.toFixed(0) ?? 'N/A'}%` });
+            const cpuText = `${stats.cpu_utilization?.toFixed(0) ?? 'N/A'}%`;
+            cpuRamRow.createSpan({ cls: 'wb-stat-value', text: cpuText });
             cpuRamRow.createSpan({ cls: 'wb-stat-spacer' }); // Add spacer
             cpuRamRow.createSpan({ cls: 'wb-stat-label', text: 'RAM:' });
             cpuRamRow.createSpan({ cls: 'wb-stat-value', text: `${stats.ram_utilization?.toFixed(0) ?? 'N/A'}%` });
@@ -209,22 +230,25 @@ async function renderPopoverContent(containerEl: HTMLElement, plugin: Workbench)
         const pendingCount = queueInfo.queue_pending.length;
         const totalRemaining = runningCount + pendingCount;
 
-        // Only show queue section if there's something running/pending or if status is Busy
-        if (totalRemaining > 0 || currentStatus === 'Busy') {
+        // Only show queue section if there's something pending OR if status is Busy and no progress bar shown
+        const showQueueSection = pendingCount > 0 || (currentStatus === 'Busy' && !runningPromptId);
+
+        if (showQueueSection) {
             const queueRow = queueContainer.createDiv({ cls: 'wb-popover-row' });
             queueRow.createSpan({ cls: 'wb-stat-label', text: 'Queue:' });
             queueRow.createSpan({ cls: 'wb-stat-value', text: `${totalRemaining}` });
 
-            if (runningCount > 0) {
+            // Show running item details only if progress bar isn't already showing it
+            if (runningCount > 0 && !runningPromptId) {
                 const runningItem = queueInfo.queue_running[0];
                 queueRow.createSpan({ cls: 'wb-stat-spacer' });
                 queueRow.createSpan({ cls: 'wb-stat-label', text: 'Run:' });
-                // Display prompt ID compactly
                 queueRow.createSpan({ cls: 'wb-stat-value wb-prompt-id', text: `#${runningItem?.[1] ?? '?'}` });
                 queueRow.title = `Running Prompt ${runningItem?.[1] ?? 'N/A'}`; // Tooltip for full info
             } else if (pendingCount > 0) {
                  queueRow.createSpan({ cls: 'wb-muted-text', text: ` (Pending: ${pendingCount})` });
-            } else if (currentStatus === 'Busy') {
+            } else if (currentStatus === 'Busy' && !runningPromptId) {
+                 // Show finishing state if busy but no specific progress tracked
                  queueRow.createSpan({ cls: 'wb-muted-text', text: ` (Finishing...)` });
             }
         } else {

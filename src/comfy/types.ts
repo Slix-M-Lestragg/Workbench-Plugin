@@ -13,6 +13,8 @@ export interface GpuStats {
 export interface SystemStats {
     cpu_utilization?: number; // Percentage
     ram_utilization?: number; // Percentage
+    ram_used?: number; // Bytes
+    ram_total?: number; // Bytes
     gpus?: GpuStats[];
 }
 

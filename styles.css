@@ -95,119 +95,135 @@
 
 /* --- Status Popover Styles --- */
 .wb-status-popover {
-    /* Inherits from .menu */
-    min-width: 200px; /* Can be smaller now */
-    max-width: 350px; /* Prevent getting too wide */
-    padding: var(--size-4-1) var(--size-4-2); /* Reduced padding */
-    border: 1px solid var(--background-modifier-border);
-    background-color: var(--background-secondary);
-    box-shadow: var(--shadow-l);
-    z-index: var(--layer-menu);
-    font-size: var(--font-ui-smaller); /* Smaller base font */
+  padding: var(--size-4-2) var(--size-4-4); /* Consistent padding */
+  min-width: 250px; /* Ensure a minimum width */
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2); /* Spacing between sections */
 }
 
-/* Popover Row Layout */
-.wb-popover-row {
-    display: flex;
-    align-items: center;
-    gap: var(--size-4-2); /* Spacing between items in a row */
-    padding: var(--size-4-1) 0; /* Reduced vertical padding */
+.wb-popover-section {
+  padding-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
 }
-
-/* Header Row Specifics */
+.wb-popover-section:first-child { /* No border for the very first section (header) */
+    padding-top: 0;
+    border-top: none;
+}
 .wb-popover-header {
-    padding-bottom: var(--size-4-1);
-    margin-bottom: var(--size-4-1);
-    border-bottom: 1px solid var(--background-modifier-border);
-    font-weight: bold;
+    border-top: none; /* Ensure header never has top border */
+    padding-top: 0;
+}
+
+
+.wb-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Distribute space */
+  gap: var(--size-4-2); /* Spacing within a row */
+  min-height: var(--input-height); /* Align height */
+  font-size: var(--font-ui-small);
+}
+
+.wb-popover-header {
+    justify-content: flex-start; /* Align header items to the start */
+    gap: var(--size-4-3);
 }
 
 .wb-popover-title-label {
+    font-weight: var(--font-semibold);
     color: var(--text-muted);
 }
 
 .wb-popover-status-text {
-    flex-grow: 1; /* Take remaining space */
-    text-align: right;
-    /* Add status-specific colors */
-}
-.wb-status-ready { color: var(--color-green); }
-.wb-status-busy { color: var(--color-yellow); }
-.wb-status-error { color: var(--color-red); }
-.wb-status-connecting, .wb-status-launching { color: var(--color-blue); }
-.wb-status-disconnected { color: var(--text-muted); }
-
-
-.wb-popover-header-button .button {
-    height: auto; /* Adjust button height */
-    line-height: 1;
-    padding: var(--size-4-1) var(--size-4-2); /* Smaller button padding */
-    font-size: var(--font-ui-smaller);
-    margin-left: var(--size-4-2); /* Space before button */
+    font-weight: var(--font-bold);
+    margin-right: auto; /* Push button to the right */
 }
 
-/* Sections */
-.wb-popover-section {
-    margin-top: var(--size-4-1);
-    padding-top: var(--size-4-1);
-    border-top: 1px solid var(--background-modifier-border-hover);
-}
-.wb-popover-section:first-of-type { /* Header is not a section */
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
+.wb-popover-header-button {
+    margin-left: auto; /* Ensure button stays right */
 }
 
-/* Stats Styling */
+/* Status Text Colors */
+.wb-status-disconnected, .wb-status-error { color: var(--text-error); }
+.wb-status-connecting, .wb-status-launching { color: var(--text-accent); }
+.wb-status-ready { color: var(--text-success); }
+.wb-status-busy { color: var(--text-warning); }
+
+
 .wb-stat-label {
-    color: var(--text-muted);
-    white-space: nowrap;
+  color: var(--text-muted);
+  flex-shrink: 0; /* Prevent labels from shrinking */
+  min-width: 40px; /* Give labels some minimum space */
+  text-align: right;
 }
 
 .wb-stat-value {
-    font-weight: bold;
-    white-space: nowrap;
+  font-weight: var(--font-semibold);
+  flex-grow: 1; /* Allow value to take up space */
+  text-align: left;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis if too long */
 }
 
 .wb-stat-spacer {
-    flex-grow: 1; /* Pushes elements apart in the row */
-    min-width: var(--size-4-2); /* Ensure some minimum space */
+    width: var(--size-4-4); /* Add space between stat pairs */
+    flex-shrink: 0;
 }
 
-/* GPU row specific styles applied when needed */
-/* .wb-gpu-row .wb-stat-label,
-.wb-gpu-row .wb-stat-value {
-    font-size: calc(var(--font-ui-smaller) * 0.95);
-} */
+.wb-gpu-row .wb-stat-label {
+    min-width: 45px; /* Slightly wider for GPU0: */
+}
 
 .wb-prompt-id {
     font-family: var(--font-monospace);
-    color: var(--text-accent);
 }
 
-
-/* Remove old title/setting styles if no longer needed */
-.wb-popover-title, /* Replaced by header row */
-.wb-popover-section h5,
-.wb-popover-section h6,
-.wb-popover-setting,
-.wb-popover-setting-compact,
-.wb-gpu-stats /* Replaced by row layout */
-{
-    display: none; /* Hide old elements */
-}
-
-/* Keep text utility classes */
 .wb-loading-text,
-.wb-muted-text,
-.wb-error-text {
-    font-size: var(--font-ui-smaller);
+.wb-muted-text {
     color: var(--text-muted);
-    padding: var(--size-4-1) 0;
-    width: 100%; /* Ensure they take full width if needed */
-    text-align: center; /* Center loading/error messages */
+    font-style: italic;
 }
-
 .wb-error-text {
     color: var(--text-error);
+}
+
+/* --- Progress Bar Styles --- */
+
+.wb-progress-bar {
+    flex-grow: 1; /* Allow progress bar to take available space */
+    height: 8px; /* Adjust height */
+    margin: 0 var(--size-4-1); /* Add some horizontal margin */
+    vertical-align: middle; /* Align with text */
+    accent-color: var(--interactive-accent); /* Use theme accent color */
+    border-radius: var(--radius-s);
+    overflow: hidden; /* Ensure rounded corners clip the bar */
+}
+/* Style the bar itself */
+.wb-progress-bar::-webkit-progress-bar {
+    background-color: var(--background-modifier-hover);
+    border-radius: var(--radius-s);
+}
+.wb-progress-bar::-webkit-progress-value {
+    background-color: var(--interactive-accent);
+    border-radius: var(--radius-s);
+    transition: width 0.1s ease-out; /* Smooth transition */
+}
+/* Firefox */
+.wb-progress-bar::-moz-progress-bar {
+    background-color: var(--interactive-accent);
+    border-radius: var(--radius-s);
+    transition: width 0.1s ease-out;
+}
+
+.wb-progress-text {
+    min-width: 60px; /* Ensure space for "100 / 100" */
+    text-align: right;
+    flex-shrink: 0;
+    font-family: var(--font-monospace);
 }

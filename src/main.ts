@@ -22,6 +22,16 @@ export default class Workbench extends Plugin {
     pollingRetryTimeoutId: number | null = null;
     app: App; // Ensure app is accessible if not already
 
+    // Properties for Crystools monitor integration
+    latestSystemStats: SystemStats | null = null;
+    systemMonitorListener: ((ev: CustomEvent<any>) => void) | null = null;
+
+    // Properties for Job Progress
+    currentRunningPromptId: string | null = null;
+    currentProgressValue: number | null = null;
+    currentProgressMax: number | null = null;
+    progressListener: ((ev: CustomEvent<any>) => void) | null = null; // To store the progress listener reference
+
     // --- Public methods for modules ---
     // Expose methods needed by other modules
     public startPolling = () => startPolling(this);
@@ -41,6 +51,7 @@ export default class Workbench extends Plugin {
             return null;
         }
         try {
+            console.log("1. Fetching system stats from main...", this.comfyApi);
             // Call the actual API fetching logic (to be implemented in api.ts)
             return await fetchSystemStats(this);
         } catch (error) {
