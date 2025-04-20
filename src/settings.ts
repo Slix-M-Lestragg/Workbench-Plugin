@@ -1,183 +1,310 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+// -------------------------
+// Imports
+// -------------------------
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type Workbench from './main';
 
-// Define the possible installation types
+// -------------------------
+// Type Definitions & Interfaces
+// -------------------------
+
+/**
+ * Possible installation types for ComfyUI.
+ */
 export type ComfyInstallType = 'script' | 'portable' | 'desktop';
 
-export interface WorkbenchSettings {
-    comfyApiUrl: string;
+/**
+ * Supported Operating Systems.
+ */
+export type OperatingSystem = 'macos' | 'windows' | 'linux' | 'unknown';
+
+/**
+ * Interface for settings that may vary per device/OS.
+ */
+export interface DeviceSpecificSettings {
     comfyUiPath: string;
-    comfyInstallType: ComfyInstallType; // <-- Add this
+    comfyInstallType: ComfyInstallType;
+}
+
+/**
+ * Main settings interface for the Workbench plugin.
+ */
+export interface WorkbenchSettings {
+    // Non-device-specific settings
+    comfyApiUrl: string;
     enablePolling: boolean;
     pollingIntervalSeconds: number;
     launchCheckDelaySeconds: number;
     enablePollingRetry: boolean;
     pollingRetryAttempts: number;
     pollingRetryDelaySeconds: number;
+
+    // Device-specific settings keyed by operating system
+    deviceSettings: Record<OperatingSystem, Partial<DeviceSpecificSettings>>;
 }
 
-export const DEFAULT_SETTINGS: WorkbenchSettings = {
-    comfyApiUrl: 'http://127.0.0.1:8188',
+// -------------------------
+// Default Settings
+// -------------------------
+
+/**
+ * Default device-specific settings used as fallback.
+ */
+export const DEFAULT_DEVICE_SETTINGS: DeviceSpecificSettings = {
     comfyUiPath: '',
-    comfyInstallType: 'script', // <-- Add default
+    comfyInstallType: 'script',
+};
+
+/**
+ * Default global settings for the Workbench plugin.
+ */
+export const DEFAULT_SETTINGS: WorkbenchSettings = {
+	comfyApiUrl: 'http://127.0.0.1:8188',
     enablePolling: true,
     pollingIntervalSeconds: 5,
     launchCheckDelaySeconds: 5,
     enablePollingRetry: true,
     pollingRetryAttempts: 3,
     pollingRetryDelaySeconds: 10,
+    deviceSettings: {
+        macos: {},
+        windows: {},
+        linux: {},
+        unknown: {},
+    },
+};
+
+// -------------------------
+// OS Helper Function
+// -------------------------
+
+/**
+ * Detects the current operating system.
+ * @returns The detected OperatingSystem.
+ */
+export function getCurrentOS(): OperatingSystem {
+    const platform = window.navigator.platform.toLowerCase();
+    if (platform.includes('mac') || platform.includes('darwin')) {
+        return 'macos';
+    } else if (platform.includes('win')) {
+        return 'windows';
+    } else if (platform.includes('linux')) {
+        return 'linux';
+    }
+    return 'unknown';
 }
 
+// -------------------------
+// SampleSettingTab Class
+// -------------------------
+
+/**
+ * A settings tab for the Workbench plugin which organizes
+ * both global (non-device-specific) and device-specific settings.
+ */
 export class SampleSettingTab extends PluginSettingTab {
     plugin: Workbench;
-    activeTab: string = 'general'; // Keep track of the active tab
+    activeTab: string = 'general'; // Track the current active tab
+    currentOS: OperatingSystem; // Detected operating system for this device
 
+    /**
+     * Constructor. Detects current OS and initializes the tab.
+     * @param app The current Obsidian App instance.
+     * @param plugin The instance of the Workbench plugin.
+     */
     constructor(app: App, plugin: Workbench) {
         super(app, plugin);
         this.plugin = plugin;
+        this.currentOS = getCurrentOS();
     }
 
+    // -------------------------
+    // Helper Methods
+    // -------------------------
+
+    /**
+     * Retrieves device-specific settings, merged with defaults.
+     * @returns The complete DeviceSpecificSettings for the current OS.
+     */
+    getCurrentDeviceSettings(): DeviceSpecificSettings {
+        // Ensure the deviceSettings object is initialized
+        if (!this.plugin.settings.deviceSettings) {
+            this.plugin.settings.deviceSettings = { macos: {}, windows: {}, linux: {}, unknown: {} };
+        }
+        if (!this.plugin.settings.deviceSettings[this.currentOS]) {
+            this.plugin.settings.deviceSettings[this.currentOS] = {};
+        }
+
+        // Merge defaults with saved settings for this OS
+        return {
+            ...DEFAULT_DEVICE_SETTINGS,
+            ...this.plugin.settings.deviceSettings[this.currentOS],
+        };
+    }
+
+    /**
+     * Saves a specific device setting.
+     * @param key The key of the setting to update.
+     * @param value The new value for the setting.
+     */
+    async saveCurrentDeviceSetting<K extends keyof DeviceSpecificSettings>(
+        key: K,
+        value: DeviceSpecificSettings[K]
+    ) {
+        if (!this.plugin.settings.deviceSettings) {
+            this.plugin.settings.deviceSettings = { macos: {}, windows: {}, linux: {}, unknown: {} };
+        }
+        if (!this.plugin.settings.deviceSettings[this.currentOS]) {
+            this.plugin.settings.deviceSettings[this.currentOS] = {};
+        }
+        this.plugin.settings.deviceSettings[this.currentOS][key] = value;
+        await this.plugin.saveSettings();
+    }
+
+    // -------------------------
+    // Display Method (UI Setup)
+    // -------------------------
+
+    /**
+     * Constructs the settings UI including tab headers and content.
+     */
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
         containerEl.createEl('h2', { text: 'Workbench Settings' });
+        // Notify the user which OS settings are being edited.
+        new Notice(`Editing settings for: ${this.currentOS.toUpperCase()}`, 3000);
 
-        // Create tab headers container
+        // Get the current device-specific settings.
+        const currentDeviceSettings = this.getCurrentDeviceSettings();
+
+        // Create containers for tab headers and content.
         const tabHeaderContainer = containerEl.createDiv('wb-settings-tab-header-container');
-
-        // Create tab content container
         const tabContentContainer = containerEl.createDiv('wb-settings-tab-content-container');
 
-        // Define tabs
+        // Define tabs for "General", "Launch", and "Polling" settings.
         type TabKey = 'general' | 'launch' | 'polling';
         const tabs: Record<TabKey, { title: string; contentEl: HTMLDivElement }> = {
             general: { title: 'General', contentEl: tabContentContainer.createDiv('wb-settings-tab-content') },
-            launch: { title: 'ComfyUI Launch', contentEl: tabContentContainer.createDiv('wb-settings-tab-content') },
+            launch: { title: `Launch (${this.currentOS.toUpperCase()})`, contentEl: tabContentContainer.createDiv('wb-settings-tab-content') },
             polling: { title: 'Status Polling', contentEl: tabContentContainer.createDiv('wb-settings-tab-content') },
         };
 
-        // Create tab headers and attach click listeners
+        // Create and set up tab headers.
         Object.entries(tabs).forEach(([keyStr, tab]) => {
-            const key = keyStr as TabKey; // Cast the key string
+            const key = keyStr as TabKey;
             const headerEl = tabHeaderContainer.createDiv('wb-settings-tab-header');
             headerEl.setText(tab.title);
-            headerEl.dataset.tabKey = key; // Store key for identification
+            headerEl.dataset.tabKey = key;
 
+            // Mark the active tab header and content.
             if (key === this.activeTab) {
                 headerEl.addClass('wb-active');
                 tab.contentEl.addClass('wb-active');
-            } else {
-                // tab.contentEl.hide(); // Hide inactive content initially - Handled later
             }
 
             headerEl.addEventListener('click', () => {
                 const clickedKey = headerEl.dataset.tabKey as TabKey;
-                if (!clickedKey) return; // Should not happen
+                if (!clickedKey) return;
 
-                // Deactivate current active tab
+                // Deactivate currently active tab header and content.
                 const currentActiveHeader = tabHeaderContainer.querySelector('.wb-settings-tab-header.wb-active');
                 const currentActiveContent = tabContentContainer.querySelector('.wb-settings-tab-content.wb-active') as HTMLElement | null;
                 if (currentActiveHeader) currentActiveHeader.removeClass('wb-active');
                 if (currentActiveContent) {
                     currentActiveContent.removeClass('wb-active');
-                    currentActiveContent.style.display = 'none'; // Hide previously active content
+                    currentActiveContent.style.display = 'none';
                 }
 
-                // Activate new tab
+                // Activate the clicked tab.
                 headerEl.addClass('wb-active');
                 const newActiveContent = tabs[clickedKey].contentEl as HTMLElement;
                 newActiveContent.addClass('wb-active');
-                newActiveContent.style.display = ''; // Show newly active content (reset display style)
-                this.activeTab = clickedKey; // Update active tab state
+                newActiveContent.style.display = '';
+                this.activeTab = clickedKey;
             });
         });
 
-        // --- Populate General Tab ---
+        // -------------------------
+        // Populate General Tab (Global Settings)
+        // -------------------------
         const generalTabContent = tabs.general.contentEl;
-        new Setting(generalTabContent)
-            .setName('ComfyUI Base Directory')
-            .setDesc('Path to the root ComfyUI directory')
-            .addText(text => text
-                .setPlaceholder('e.g., K:\\programs\\ComfyUI')
-                .setValue(this.plugin.settings.comfyUiPath)
-                .onChange(async (value) => {
-                    this.plugin.settings.comfyUiPath = value;
-                    await this.plugin.saveSettings();
-                }));
 
         new Setting(generalTabContent)
             .setName('ComfyUI API URL')
-            .setDesc('URL for the ComfyUI web interface')
+            .setDesc('URL for the ComfyUI web interface (shared across devices)')
             .addText(text => text
                 .setPlaceholder('http://localhost:8188')
                 .setValue(this.plugin.settings.comfyApiUrl)
                 .onChange(async (value) => {
                     this.plugin.settings.comfyApiUrl = value;
                     await this.plugin.saveSettings();
-                    // Optionally trigger a connection check if the URL changes
-                    // await this.plugin.checkComfyConnection(); // Consider UX implications
                 }));
 
-
-        // --- Populate Launch Tab ---
+        // -------------------------
+        // Populate Launch Tab (Device-Specific Settings)
+        // -------------------------
         const launchTabContent = tabs.launch.contentEl;
+        launchTabContent.createEl('p', { text: `These settings apply specifically to your ${this.currentOS.toUpperCase()} system.` });
 
-        // Setting for Installation Type
         new Setting(launchTabContent)
-            .setName('ComfyUI Installation Type')
-            .setDesc('Select how your ComfyUI is installed.')
+            .setName(`ComfyUI Base Directory (${this.currentOS.toUpperCase()})`)
+            .setDesc('Path to the root ComfyUI directory for this device.')
+            .addText(text => text
+                .setPlaceholder(this.currentOS === 'windows' ? 'e.g., C:\\ComfyUI' : 'e.g., /path/to/ComfyUI')
+                .setValue(currentDeviceSettings.comfyUiPath)
+                .onChange(async (value) => {
+                    await this.saveCurrentDeviceSetting('comfyUiPath', value);
+                }));
+
+        new Setting(launchTabContent)
+            .setName(`ComfyUI Installation Type (${this.currentOS.toUpperCase()})`)
+            .setDesc('Select how ComfyUI is installed on this device.')
             .addDropdown(dropdown => dropdown
-                .addOption('script', 'Script-based (Requires run_*.bat or run_*.sh)')
-                .addOption('portable', 'Portable Version (Uses standard portable structure)')
-                .addOption('desktop', 'Desktop Application (Experimental - Launch may vary)')
-                .setValue(this.plugin.settings.comfyInstallType)
+                .addOption('script', 'Script-based (run_*.bat or run_*.sh)')
+                .addOption('portable', 'Portable Version')
+                .addOption('desktop', 'Desktop Application (Experimental)')
+                .setValue(currentDeviceSettings.comfyInstallType)
                 .onChange(async (value: ComfyInstallType) => {
-                    this.plugin.settings.comfyInstallType = value;
-                    await this.plugin.saveSettings();
-                    // Optionally re-render parts of the UI if needed based on type
-                    // this.display(); // Avoid full re-render if possible
+                    await this.saveCurrentDeviceSetting('comfyInstallType', value);
                 }));
 
         new Setting(launchTabContent)
             .setName('Launch ComfyUI')
-            .setDesc('Start ComfyUI based on the selected installation type.')
+            .setDesc('Start ComfyUI using the settings for this device.')
             .addButton(button => button
-                .setButtonText('Launch ComfyUI') // Changed text slightly
+                .setButtonText('Launch ComfyUI')
                 .setCta()
                 .onClick(() => {
                     this.plugin.launchComfyUI();
                 }));
 
-        // Add setting for launch delay
         new Setting(launchTabContent)
             .setName('Launch Connection Check Delay (seconds)')
-            .setDesc('How long to wait after launching ComfyUI before checking the API connection.')
+            .setDesc('How long to wait after launching ComfyUI before checking the API connection (shared across devices).')
             .addText(text => text
                 .setPlaceholder('e.g., 5')
                 .setValue(this.plugin.settings.launchCheckDelaySeconds.toString())
                 .onChange(async (value) => {
                     let delay = parseInt(value || '5', 10);
-                    if (isNaN(delay) || delay < 1) {
-                        delay = 5; // Ensure a minimum delay
-                    }
+                    if (isNaN(delay) || delay < 1) delay = 5;
                     this.plugin.settings.launchCheckDelaySeconds = delay;
                     await this.plugin.saveSettings();
                 }));
 
-
-        // --- Populate Polling Tab ---
+        // -------------------------
+        // Populate Polling Tab (Global Settings)
+        // -------------------------
         const pollingTabContent = tabs.polling.contentEl;
-        // pollingTabContent.createEl('h3', { text: 'Status Polling' }); // Title now handled by tab
 
         new Setting(pollingTabContent)
             .setName('Enable Status Polling')
-            .setDesc('Periodically check ComfyUI status via API calls.')
+            .setDesc('Periodically check ComfyUI status via API calls (shared across devices).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enablePolling)
                 .onChange(async (value) => {
                     this.plugin.settings.enablePolling = value;
                     await this.plugin.saveSettings();
-                    // Use plugin instance methods
                     if (value && this.plugin.currentComfyStatus === 'Ready') {
                         this.plugin.startPolling();
                     } else {
@@ -187,33 +314,29 @@ export class SampleSettingTab extends PluginSettingTab {
 
         new Setting(pollingTabContent)
             .setName('Polling Interval (seconds)')
-            .setDesc('How often to check the ComfyUI status (minimum 2 seconds).')
+            .setDesc('How often to check the ComfyUI status (minimum 2 seconds, shared across devices).')
             .addText(text => text
                 .setPlaceholder('e.g., 5')
                 .setValue(this.plugin.settings.pollingIntervalSeconds.toString())
                 .onChange(async (value) => {
                     let interval = parseInt(value || '5', 10);
-                    if (isNaN(interval) || interval < 2) {
-                        interval = 2;
-                    }
+                    if (isNaN(interval) || interval < 2) interval = 2;
                     this.plugin.settings.pollingIntervalSeconds = interval;
                     await this.plugin.saveSettings();
-                    // Restart polling with the new interval if it's currently active and enabled
-                    if (this.plugin.settings.enablePolling && (this.plugin.currentComfyStatus === 'Ready' || this.plugin.currentComfyStatus === 'Busy')) {
-                         this.plugin.startPolling(); // Restart polling
+                    if (this.plugin.settings.enablePolling &&
+                        (this.plugin.currentComfyStatus === 'Ready' || this.plugin.currentComfyStatus === 'Busy')) {
+                        this.plugin.startPolling();
                     }
                 }));
 
-        // --- Add Polling Retry Settings ---
         new Setting(pollingTabContent)
             .setName('Enable Polling Retry on Error')
-            .setDesc('If polling fails (e.g., server temporarily unavailable), automatically retry a few times before stopping.')
+            .setDesc('If polling fails, automatically retry (shared across devices).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enablePollingRetry)
                 .onChange(async (value) => {
                     this.plugin.settings.enablePollingRetry = value;
                     await this.plugin.saveSettings();
-                    // Reset retry count if retries are disabled
                     if (!value) {
                         this.plugin.pollingRetryCount = 0;
                         if (this.plugin.pollingRetryTimeoutId) {
@@ -221,48 +344,37 @@ export class SampleSettingTab extends PluginSettingTab {
                             this.plugin.pollingRetryTimeoutId = null;
                         }
                     }
-                    // No need to call display() here anymore, just manage the state
-                    // We might need to re-render the *content* of this tab if settings appear/disappear
-                    // For now, let's assume the retry settings are always visible if the toggle is on
-                    // A more robust solution might involve re-rendering the polling tab content specifically
                 }));
 
-        // Only show retry attempts/delay if retry is enabled
-        // Note: This simple approach doesn't dynamically hide/show these settings when the toggle changes
-        // without a full re-render. A more complex approach would be needed for that.
         if (this.plugin.settings.enablePollingRetry) {
             new Setting(pollingTabContent)
                 .setName('Polling Retry Attempts')
-                .setDesc('How many times to retry polling after an error.')
+                .setDesc('How many times to retry polling after an error (shared across devices).')
                 .addText(text => text
                     .setPlaceholder('e.g., 3')
                     .setValue(this.plugin.settings.pollingRetryAttempts.toString())
                     .onChange(async (value) => {
                         let attempts = parseInt(value || '3', 10);
-                        if (isNaN(attempts) || attempts < 0) {
-                            attempts = 0; // Allow 0 retries
-                        }
+                        if (isNaN(attempts) || attempts < 0) attempts = 0;
                         this.plugin.settings.pollingRetryAttempts = attempts;
                         await this.plugin.saveSettings();
                     }));
 
             new Setting(pollingTabContent)
                 .setName('Polling Retry Delay (seconds)')
-                .setDesc('How long to wait between polling retry attempts.')
+                .setDesc('How long to wait between polling retry attempts (shared across devices).')
                 .addText(text => text
                     .setPlaceholder('e.g., 10')
                     .setValue(this.plugin.settings.pollingRetryDelaySeconds.toString())
                     .onChange(async (value) => {
                         let delay = parseInt(value || '10', 10);
-                        if (isNaN(delay) || delay < 1) {
-                            delay = 1; // Minimum 1 second delay
-                        }
+                        if (isNaN(delay) || delay < 1) delay = 1;
                         this.plugin.settings.pollingRetryDelaySeconds = delay;
                         await this.plugin.saveSettings();
                     }));
         }
 
-        // Initial hide for inactive tabs
+        // Initially hide inactive tabs.
         Object.entries(tabs).forEach(([keyStr, tab]) => {
             const key = keyStr as TabKey;
             if (key !== this.activeTab) {

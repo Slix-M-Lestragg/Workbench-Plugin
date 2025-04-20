@@ -20,8 +20,10 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
     - Uses a custom icon in the Obsidian interface for JSON files associated with this view.
 - **API Integration**: Configure the connection to your ComfyUI API endpoint.
 - **Polling**: Optionally polls the ComfyUI server to keep the status up-to-date.
-- **Launch Helpers (Optional)**: Commands to attempt launching ComfyUI (requires configuration).
-- **Tabbed Settings**: Organizes plugin settings into clear tabs (General, Launch, Polling).
+- **Launch Helpers**:  
+  - **Desktop App (macOS):** `Launch ComfyUI App (macOS)` command to open the native ComfyUI desktop application.  
+  - **Script/Portable:** `Launch ComfyUI Script` command to run your configured `.sh`/`.bat` launcher or `main.py` on Windows/Linux.
+- **Log State:** `Log ComfyUI State to Console` command to dump the current connection status and SDK object.
 
 ## Installation
 
@@ -73,6 +75,25 @@ Workbench bridges the gap between your Obsidian vault and web-based AI tools, al
 - Receive generated images/data back into Obsidian notes.
 - More robust error handling and feedback.
 - Workflow templates and presets.
+
+---
+
+## Documentation Status
+
+Track which source files have inline documentation/comments and which still need it:
+
+- [x] src/main.ts  
+- [x] src/commands.ts  
+- [x] src/settings.ts  
+- [x] src/comfy/launch.ts  
+- [x] src/comfy/api.ts  
+- [x] src/comfy/polling.ts  
+- [x] src/comfy/generation.ts  
+- [ ] src/ui/JsonViewer.ts  
+- [ ] src/ui/status_bar.ts  
+- [ ] src/ui/StatusBarPopover.ts  
+- [ ] src/ui/icons.ts  
+- [ ] styles.css
 
 ## Contributing
 

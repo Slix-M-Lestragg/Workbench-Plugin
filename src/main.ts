@@ -1,18 +1,31 @@
-import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App } from 'obsidian'; // Added App
-import { WorkbenchSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
-import { ComfyStatus, SystemStats, QueueInfo } from './comfy/types'; // Import new types
+// Imports
+// -------------------------
+import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App } from 'obsidian'; // [obsidian](https://help.obsidian.md)
+import {
+    WorkbenchSettings,
+    DEFAULT_SETTINGS,
+    SampleSettingTab,
+    OperatingSystem,
+    DeviceSpecificSettings,
+    DEFAULT_DEVICE_SETTINGS,
+    getCurrentOS, // from [src/settings.ts](src/settings.ts)
+    ComfyInstallType
+} from './settings';
+import { ComfyStatus, SystemStats, QueueInfo } from './comfy/types'; // from [src/comfy/types.ts](src/comfy/types.ts)
 import { ComfyApi } from '@saintno/comfyui-sdk';
-import { setupStatusBar, updateStatusBar } from './ui/status_bar';
-// Assuming api.ts will export functions to fetch stats and queue
-import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api';
-import { startPolling, stopPolling } from './comfy/polling';
-import { launchComfyUI } from './comfy/launch'; // <-- Import the new unified launch function
-import { registerCommands } from './commands';
-import { runWorkflow } from './comfy/generation';
-import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // <-- Import JsonView
-import { JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG } from './ui/icons'; // <-- Import icon constants
+import { setupStatusBar, updateStatusBar } from './ui/status_bar'; // from [src/ui/status_bar.ts](src/ui/status_bar.ts)
+import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api'; // from [src/comfy/api.ts](src/comfy/api.ts)
+import { startPolling, stopPolling } from './comfy/polling'; // from [src/comfy/polling.ts](src/comfy/polling.ts)
+import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](src/comfy/launch.ts)
+import { registerCommands } from './commands'; // from [src/commands.ts](src/commands.ts)
+import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
+import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
+import { JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG } from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
 
+// Main Plugin Class: Workbench
+// -------------------------
 export default class Workbench extends Plugin {
+    // Plugin settings and connection state
     settings: WorkbenchSettings;
     comfyApi: ComfyApi | null = null;
     statusBarItemEl: HTMLElement | null = null;
@@ -20,27 +33,44 @@ export default class Workbench extends Plugin {
     pollingIntervalId: number | null = null;
     pollingRetryCount: number = 0;
     pollingRetryTimeoutId: number | null = null;
-    app: App; // Ensure app is accessible if not already
+    app: App; // Provided by obsidian
+    currentOS: OperatingSystem; // Determined on load
 
-    // Properties for Crystools monitor integration
+    // Crystools / System monitoring properties
     latestSystemStats: SystemStats | null = null;
     systemMonitorListener: ((ev: CustomEvent<any>) => void) | null = null;
 
-    // Properties for Job Progress
+    // Workflow execution progress properties
     currentRunningPromptId: string | null = null;
     currentProgressValue: number | null = null;
     currentProgressMax: number | null = null;
-    progressListener: ((ev: CustomEvent<any>) => void) | null = null; // To store the progress listener reference
+    progressListener: ((ev: CustomEvent<any>) => void) | null = null;
 
-    // --- Public methods for modules ---
-    // Expose methods needed by other modules
+    
+// Public Methods Exposed to Other Modules
+// -------------------------
     public startPolling = () => startPolling(this);
     public stopPolling = () => stopPolling(this);
-    public launchComfyUI = () => launchComfyUI(this); // <-- Add the new unified launch method
+    public launchComfyUI = () => launchComfyUI(this);
     public checkComfyConnection = () => checkComfyConnection(this);
-    public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file); // Expose the execution method
+    public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file);
 
-    // --- Methods for Status Modal ---
+
+// Helper Methods
+// -------------------------
+    /** Merges device-specific settings with default values.
+     * @returns A DeviceSpecificSettings object for the current OS.
+     */
+    public getCurrentDeviceSettings(): DeviceSpecificSettings {
+        const osSettings = this.settings.deviceSettings?.[this.currentOS] ?? {};
+        return {
+            ...DEFAULT_DEVICE_SETTINGS,
+            ...osSettings
+        };
+    }
+
+    /** Fetch system statistics using the API.
+     */
     public async getSystemStats(): Promise<SystemStats | null> {
         if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
             console.log("Cannot fetch system stats, ComfyUI not connected.");
@@ -48,7 +78,6 @@ export default class Workbench extends Plugin {
         }
         try {
             console.log("1. Fetching system stats from main...", this.comfyApi);
-            // Call the actual API fetching logic (to be implemented in api.ts)
             return await fetchSystemStats(this);
         } catch (error) {
             console.error("Error fetching system stats from main:", error);
@@ -56,13 +85,14 @@ export default class Workbench extends Plugin {
         }
     }
 
+    /** Fetch the current queue information from the API.
+     */
     public async getQueueInfo(): Promise<QueueInfo | null> {
         if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
             console.log("Cannot fetch queue info, ComfyUI not connected.");
             return null;
         }
         try {
-            // Call the actual API fetching logic (to be implemented in api.ts)
             return await fetchQueueInfo(this);
         } catch (error) {
             console.error("Error fetching queue info from main:", error);
@@ -70,91 +100,80 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /* Lifecycle Methods */
+    // Lifecycle Methods
+    // -------------------------
     async onload() {
-        this.app = this.app; // Ensure app is assigned if needed elsewhere, Obsidian usually handles this
+        // Initialize OS and settings
+        this.app = this.app;
+        this.currentOS = getCurrentOS();
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
-        // --- Register Custom JSON Icon ---
+        // Register custom JSON icon
         addIcon(JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG);
         console.log("Registered custom JSON icon.");
 
-        setupStatusBar(this); // Sets up the status bar element and click handler
+        // Initialize status bar and commands
+        setupStatusBar(this);
         registerCommands(this);
 
-        // --- Register JSON View ---
-        this.registerView(
-            JSON_VIEW_TYPE,
-            (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf) // Pass app instance
-            // Icon is set in the JsonView class via getIcon()
-        );
+        // Register the custom JSON view for .json files
+        this.registerView(JSON_VIEW_TYPE, (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf));
         this.registerExtensions(["json"], JSON_VIEW_TYPE);
         console.log(`Registered JSON view for '.json' files.`);
 
-        // --- Register File Menu Event Handler ---
-        this.registerEvent(
-            this.app.workspace.on('file-menu', (menu: Menu, file) => {
-                if (file instanceof TFile && file.extension === 'json') {
-                    // Add the "Copy Workflow & Open ComfyUI" menu item
-                    this.addCopyAndOpenComfyMenuItem(menu, file); // Renamed function
-                    // Add the "Run Workflow" menu item (conditionally)
-                    this.addRunWorkflowMenuItem(menu, file);
-                }
-            })
-        );
+        // Register file-menu items for JSON files
+        this.registerEvent(this.app.workspace.on('file-menu', (menu: Menu, file) => {
+            if (file instanceof TFile && file.extension === 'json') {
+                this.addCopyAndOpenComfyMenuItem(menu, file);
+                this.addRunWorkflowMenuItem(menu, file);
+            }
+        }));
 
-        // --- Initial Connection Check ---
+        // Initial connection check after a delay
         setTimeout(() => {
             console.log("Performing initial ComfyUI connection check...");
             if (this.currentComfyStatus === 'Disconnected') {
-                 // Don't await, let it run in the background
-                 this.checkComfyConnection().then(connected => {
-                     if (connected) {
-                         console.log("Initial connection successful.");
-                         // Polling is started by checkComfyConnection/handleConnectionSuccess if enabled
-                     } else {
-                         console.log("Initial connection failed.");
-                         // Status bar should reflect Error or Disconnected state
-                     }
-                 }).catch(error => {
-                     // This catch is unlikely needed as the promise resolves true/false
-                     console.error("Unexpected error during initial connection check:", error);
-                 });
+                this.checkComfyConnection().then(connected => {
+                    if (connected) {
+                        console.log("Initial connection successful.");
+                    } else {
+                        console.log("Initial connection failed.");
+                    }
+                }).catch(error => {
+                    console.error("Unexpected error during initial connection check:", error);
+                });
             } else {
-                 console.log(`Skipping initial connection check, status is: ${this.currentComfyStatus}`);
-                 // If already connected but polling is off, start it
-                 if (this.settings.enablePolling && this.pollingIntervalId === null && (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy')) {
-                     console.log("Restarting polling for existing connection.");
-                     this.startPolling();
-                 }
+                console.log(`Skipping initial connection check, status is: ${this.currentComfyStatus}`);
+                if (this.settings.enablePolling && this.pollingIntervalId === null &&
+                    (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy')) {
+                    console.log("Restarting polling for existing connection.");
+                    this.startPolling();
+                }
             }
-        }, 5000); // <-- Increased delay to 5 seconds (5000ms)
+        }, 5000);
     }
 
-    // Helper function to add the "Copy Workflow & Open ComfyUI" menu item
-    addCopyAndOpenComfyMenuItem(menu: Menu, file: TFile) { // Renamed function
+    
+// File Menu Helpers
+// -------------------------
+    /** Add "Copy Workflow & Open ComfyUI" item to the file menu.
+     * @param menu The current file menu reference.
+     * @param file The JSON file.
+     */
+    addCopyAndOpenComfyMenuItem(menu: Menu, file: TFile) {
         const apiUrlString = this.settings.comfyApiUrl?.trim();
         if (apiUrlString) {
             menu.addItem((item) => {
-                item
-                    .setTitle("Copy Workflow & Open ComfyUI") // Updated title
-                    .setIcon("copy-plus") // Changed icon to reflect copy action
-                    .onClick(async () => { // Make async to read file
+                item.setTitle("Copy Workflow & Open ComfyUI")
+                    .setIcon("copy-plus")
+                    .onClick(async () => {
                         if (this.settings.comfyApiUrl) {
                             try {
-                                // 1. Read the workflow file content
                                 const workflowJson = await this.app.vault.read(file);
-
-                                // 2. Copy to clipboard
                                 await navigator.clipboard.writeText(workflowJson);
-
-                                // 3. Open the base ComfyUI URL in a new tab
                                 window.open(this.settings.comfyApiUrl, '_blank');
-
-                                // 4. Notify user
                                 new Notice(`Workflow '${file.name}' copied! Paste it into ComfyUI (Cmd/Ctrl+V).`);
-
                             } catch (error) {
                                 console.error("Error copying workflow or opening ComfyUI:", error);
                                 new Notice(`Failed to copy workflow: ${error instanceof Error ? error.message : String(error)}`);
@@ -167,52 +186,43 @@ export default class Workbench extends Plugin {
         }
     }
 
-
-    // Renamed the original function to clarify its purpose
+    /** Add "Run ComfyUI Workflow" item to the file menu.
+     * @param menu The current file menu reference.
+     * @param file The JSON file.
+     */
     addRunWorkflowMenuItem(menu: Menu, file: TFile) {
-        // Only add the "Run" option if ComfyUI is Ready or Busy
         if (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy') {
             menu.addItem((item) => {
-                item
-                    .setTitle("Run ComfyUI Workflow")
-                    .setIcon("play-circle") // Keep the play icon for execution
+                item.setTitle("Run ComfyUI Workflow")
+                    .setIcon("play-circle")
                     .onClick(async () => {
-                        // Call the execution method
                         await this.executeWorkflowFromFile(file);
                     });
             });
         } else if (this.currentComfyStatus !== 'Disconnected' && this.currentComfyStatus !== 'Error') {
-            // Add a disabled "Run" option if connecting/launching
-             menu.addItem((item) => {
-                item
-                    .setTitle("Run ComfyUI Workflow (ComfyUI not ready)")
+            menu.addItem((item) => {
+                item.setTitle("Run ComfyUI Workflow (ComfyUI not ready)")
                     .setIcon("play-circle")
                     .setDisabled(true);
-             });
+            });
         }
     }
 
-    // Method to execute a workflow from a file (used by command and Run menu item)
+    /** Execute a ComfyUI workflow from a JSON file.
+     * @param file The JSON file.
+     */
     async executeWorkflowFromFile(file: TFile) {
         if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
             new Notice('ComfyUI is not connected or ready. Please check connection.');
-            // Optionally trigger a connection check here?
-            // await this.checkComfyConnection();
             return;
         }
         try {
             new Notice(`Loading workflow: ${file.name}`);
             const workflowJson = await this.app.vault.read(file);
             const workflowData = JSON.parse(workflowJson);
-
             console.log(`Running workflow from file: ${file.path}`);
-            updateStatusBar(this, 'Busy', `Running workflow: ${file.name}`); // Update status
+            updateStatusBar(this, 'Busy', `Running workflow: ${file.name}`);
             await runWorkflow(this, workflowData);
-            // Assuming runWorkflow doesn't update status on completion,
-            // pollStatus will eventually correct it, or update manually if needed.
-            // Consider adding a success notice here if runWorkflow doesn't provide one.
-            // new Notice(`Workflow ${file.name} execution started.`);
-
         } catch (error) {
             console.error(`Error running workflow from ${file.path}:`, error);
             new Notice(`Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
@@ -221,30 +231,82 @@ export default class Workbench extends Plugin {
     }
 
 
+// Unload and Cleanup
+// -------------------------
     onunload() {
         console.log("Unloading Workbench plugin.");
         this.statusBarItemEl?.remove();
         this.stopPolling();
-        // Clean up SDK instance
         if (this.comfyApi) {
-             try {
-                 if (typeof (this.comfyApi as any).close === 'function') {
-                     (this.comfyApi as any).close();
-                     console.log("Closed ComfyUI WebSocket connection on unload.");
-                 }
-             } catch (e) {
-                 console.warn("Error closing ComfyUI connection on unload:", e);
-             }
-             this.comfyApi = null;
+            try {
+                if (typeof (this.comfyApi as any).close === 'function') {
+                    (this.comfyApi as any).close();
+                    console.log("Closed ComfyUI WebSocket connection on unload.");
+                }
+            } catch (e) {
+                console.warn("Error closing ComfyUI connection on unload:", e);
+            }
+            this.comfyApi = null;
         }
     }
 
-    /* Settings Methods */
+
+// Settings Methods
+// -------------------------
+    /** Loads settings from disk, merging saved data with defaults.
+     */
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const loadedData = await this.loadData();
+        const mergedSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+        // Merge top-level settings
+        for (const key in mergedSettings) {
+            if (key !== 'deviceSettings' && loadedData && loadedData.hasOwnProperty(key)) {
+                (mergedSettings as any)[key] = loadedData[key];
+            }
+        }
+
+        // Merge device-specific settings
+        mergedSettings.deviceSettings = mergedSettings.deviceSettings || {};
+        for (const osKey of Object.keys(DEFAULT_SETTINGS.deviceSettings) as OperatingSystem[]) {
+            const defaultOsSettings = DEFAULT_SETTINGS.deviceSettings[osKey] || {};
+            const savedOsSettings = loadedData?.deviceSettings?.[osKey] ?? {};
+            mergedSettings.deviceSettings[osKey] = { ...defaultOsSettings, ...savedOsSettings };
+        }
+
+        this.settings = mergedSettings;
+
+        // Migrate old top-level comfyUiPath if present
+        if (loadedData && loadedData.hasOwnProperty('comfyUiPath') && typeof loadedData.comfyUiPath === 'string') {
+            console.log(`Migrating old top-level 'comfyUiPath' setting for OS: ${this.currentOS}`);
+            if (!this.settings.deviceSettings[this.currentOS]) {
+                this.settings.deviceSettings[this.currentOS] = {};
+            }
+            if (!this.settings.deviceSettings[this.currentOS].comfyUiPath) {
+                this.settings.deviceSettings[this.currentOS].comfyUiPath = loadedData.comfyUiPath;
+            }
+        }
+        if (loadedData && loadedData.hasOwnProperty('comfyInstallType') && typeof loadedData.comfyInstallType === 'string') {
+            console.log(`Migrating old top-level 'comfyInstallType' setting for OS: ${this.currentOS}`);
+            if (!this.settings.deviceSettings[this.currentOS]) {
+                this.settings.deviceSettings[this.currentOS] = {};
+            }
+            if (!this.settings.deviceSettings[this.currentOS].comfyInstallType) {
+                this.settings.deviceSettings[this.currentOS].comfyInstallType = loadedData.comfyInstallType as ComfyInstallType;
+            }
+        }
     }
 
+    /** Saves settings back to disk.
+     */
     async saveSettings() {
-        await this.saveData(this.settings);
+        const settingsToSave = { ...this.settings };
+        if (settingsToSave.hasOwnProperty('comfyUiPath')) {
+            delete (settingsToSave as any).comfyUiPath;
+        }
+        if (settingsToSave.hasOwnProperty('comfyInstallType')) {
+            delete (settingsToSave as any).comfyInstallType;
+        }
+        await this.saveData(settingsToSave);
     }
 }

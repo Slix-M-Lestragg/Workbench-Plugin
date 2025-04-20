@@ -58,8 +58,10 @@ export function launchComfyUiDesktopApp(pluginInstance: Workbench): void {
 export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
     const platform = window.navigator.platform.toLowerCase();
     const settings = pluginInstance.settings;
-    const basePath = settings.comfyUiPath?.trim();
-    const installType = settings.comfyInstallType;
+    // Retrieve device-specific settings
+    const { comfyUiPath, comfyInstallType } = pluginInstance.getCurrentDeviceSettings();
+    const basePath = comfyUiPath?.trim();
+    const installType = comfyInstallType;
 
     if (!basePath) {
         new Notice('ComfyUI base directory path is not set. Please configure it in settings.');
