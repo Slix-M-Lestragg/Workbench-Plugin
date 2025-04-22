@@ -134,14 +134,21 @@ export default class Workbench extends Plugin {
         setTimeout(() => {
             console.log("Performing initial ComfyUI connection check...");
             if (this.currentComfyStatus === 'Disconnected') {
+                // Pass true to indicate this is the initial check
                 this.checkComfyConnection().then(connected => {
                     if (connected) {
                         console.log("Initial connection successful.");
                     } else {
-                        console.log("Initial connection failed.");
+                        // Failure is handled within checkComfyConnection/handleConnectionFailure
+                        // It will set status to Disconnected if it was a typical server offline error
+                        console.log("Initial connection check indicated server is not reachable.");
                     }
                 }).catch(error => {
+                    // Catch unexpected errors during the check itself
                     console.error("Unexpected error during initial connection check:", error);
+                    // Ensure status reflects an error in this case
+                    updateStatusBar(this, 'Error', 'Initial check failed unexpectedly');
+                    this.currentComfyStatus = 'Error';
                 });
             } else {
                 console.log(`Skipping initial connection check, status is: ${this.currentComfyStatus}`);
@@ -151,7 +158,7 @@ export default class Workbench extends Plugin {
                     this.startPolling();
                 }
             }
-        }, 5000);
+        }, 1000);
     }
 
     
