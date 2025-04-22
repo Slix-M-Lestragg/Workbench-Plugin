@@ -145,13 +145,14 @@
 
             console.log('Initializing ComfyUI SDK instance for actions/websockets...');
             const clientId = `obsidian-workbench-${Date.now()}`; // Unique client ID for WebSocket
+
             pluginInstance.comfyApi = new ComfyApi(httpUrl, clientId);
 
             // Add persistent listeners AFTER creating the instance.
             // These handle WebSocket closure and errors.
             pluginInstance.comfyApi.addEventListener('close', () => handleSdkClose(pluginInstance));
             pluginInstance.comfyApi.addEventListener('error', (errorEvent: any) => handleSdkError(pluginInstance, errorEvent));
-
+            
             // Progress Listener setup via SDK.
             console.log("Subscribing to progress events via SDK.");
             pluginInstance.progressListener = (ev: CustomEvent<any>) => handleProgressEvent(pluginInstance, ev.detail);
@@ -161,8 +162,9 @@
             // This happens asynchronously. We don't await it here.
             // The connection status is primarily determined by polling initially.
             // Errors or closures during init will be caught by the 'error'/'close' listeners attached above.
-            pluginInstance.comfyApi.init();
-            console.log("ComfyUI SDK WebSocket initialization initiated.");
+            //pluginInstance.comfyApi.init(); // Removed: Explicit init() call caused CORS issues with PATCH. SDK might connect implicitly.
+            console.log("ComfyUI SDK instance created. WebSocket connection will be established as needed or automatically by the SDK.");
+            
             /* // Removed incorrect promise handling: The SDK's init might not return a promise,
             // and relying on events ('close', 'error') is more robust.
             pluginInstance.comfyApi.init().then(() => { ... }).catch(initError => { ... });
@@ -178,6 +180,7 @@
 
         // --- Start Polling ---
         try {
+            console.log("Performing initial status poll...");
             // Perform an initial poll immediately to set the Ready/Busy state.
             await pollStatus(pluginInstance);
             pluginInstance.pollingRetryCount = 0; // Reset retry count after successful connection and initial poll.
