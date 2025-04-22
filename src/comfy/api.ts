@@ -365,21 +365,15 @@
                 return handleConnectionFailure(pluginInstance, 'Invalid ComfyUI API URL format', isInitialCheck);
             }
 
-            // Check if already disconnected before attempting a new connection
-            if (pluginInstance.currentComfyStatus === 'Disconnected') {
-                console.log("Status is already Disconnected. Updating status bar without treating as a new error.");
-                updateStatusBar(pluginInstance, 'Disconnected', 'Attempting to reconnect...');
-                return false; // Indicate connection failure but don't treat it as a new error.
-            }
+            const wasDisconnected = pluginInstance.currentComfyStatus === 'Disconnected'; // Check if it was previously disconnected
     
         // Reset polling retry count for the new connection attempt.
             pluginInstance.pollingRetryCount = 0;
         // Update status bar to indicate connection attempt.
             updateStatusBar(pluginInstance, 'Connecting', `Connecting to ${apiUrlString}...`);
-    
             try {
                 // Perform a simple GET request to the check endpoint using Obsidian's requestUrl.
-                console.log(`Checking ComfyUI API connection at: ${checkUrl}`);
+                console.log(`Checking ComfyUI API connection at: ${checkUrl} with ${pluginInstance.currentComfyStatus}`);
                 const response = await requestUrl({
                     url: checkUrl,
                     method: 'GET',
@@ -404,7 +398,7 @@
                     reason += `: ${error.message}`;
                 }
                 // Provide more specific feedback for common network issues.
-                const isConnectionRefused = error.message?.includes('ECONNREFUSED') || error.message?.includes('Failed to fetch');
+                const isConnectionRefused = error.message?.includes('ERR_CONNECTION_REFUSED') || error.message?.includes('Failed to fetch');
                 if (isConnectionRefused) {
                     reason = 'Connection refused (Server offline?)';
                 }
