@@ -21,6 +21,7 @@ import { registerCommands } from './commands'; // from [src/commands.ts](src/com
 import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
 import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
 import { JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG } from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
+import { ModelListView, MODEL_LIST_VIEW_TYPE } from './ui/ModelListView'; // Added import for new view
 
 // Main Plugin Class: Workbench
 // -------------------------
@@ -116,7 +117,7 @@ export default class Workbench extends Plugin {
         let tooltip = 'Launch ComfyUI';
 
         if (status === 'Ready' || status === 'Busy') {
-            iconName = 'workflow'; // Icon for opening the web UI
+            iconName = 'app-window'; // Icon for opening the web UI
             tooltip = 'Open ComfyUI Web Interface';
             if (!this.settings.comfyApiUrl?.trim()) {
                 tooltip = 'Cannot Open ComfyUI (URL not set)';
@@ -161,6 +162,13 @@ export default class Workbench extends Plugin {
         this.registerView(JSON_VIEW_TYPE, (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf));
         this.registerExtensions(["json"], JSON_VIEW_TYPE);
         console.log(`Registered JSON view for '.json' files.`);
+
+        // Register the new Model List view
+        this.registerView(
+            MODEL_LIST_VIEW_TYPE,
+            (leaf: WorkspaceLeaf) => new ModelListView(leaf, this.app, this)
+        );
+        console.log(`Registered ComfyUI Model List view.`);
 
         // Register file-menu items for JSON files
         this.registerEvent(this.app.workspace.on('file-menu', (menu: Menu, file) => {

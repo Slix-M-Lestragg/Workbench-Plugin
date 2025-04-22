@@ -1,6 +1,7 @@
 import type Workbench from './main';
 import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
 import { Notice, TFile, setIcon } from 'obsidian'; // Import TFile and setIcon
+import { MODEL_LIST_VIEW_TYPE } from './ui/ModelListView'; // Added import for view type
 
 /**
  * Registers all Workbench plugin commands.
@@ -71,6 +72,34 @@ export function registerCommands(pluginInstance: Workbench): void {
                 });
             }
             return true;
+        },
+    });
+
+    /**
+     * Command: Show ComfyUI Models.
+     * @id show-comfyui-models
+     * @description Opens a view listing available models in the ComfyUI models directory.
+     */
+    pluginInstance.addCommand({
+        id: 'show-comfyui-models',
+        name: 'Show ComfyUI Models',
+        callback: async () => {
+            // Check if view is already open, if so, just reveal it
+            const existingLeaves = pluginInstance.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
+            if (existingLeaves.length > 0) {
+                pluginInstance.app.workspace.revealLeaf(existingLeaves[0]);
+                return;
+            }
+
+            // Otherwise, open in a new leaf
+            await pluginInstance.app.workspace.getLeaf(true).setViewState({
+                type: MODEL_LIST_VIEW_TYPE,
+                active: true,
+            });
+            // Ensure the new leaf is revealed
+            pluginInstance.app.workspace.revealLeaf(
+                pluginInstance.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE)[0]
+            );
         },
     });
 

@@ -246,3 +246,85 @@
     flex-shrink: 0;
     font-family: var(--font-monospace);
 }
+
+/* Styling for the Model List View */
+.wb-model-list-view {
+  padding: 10px;
+}
+
+.wb-model-tree-root {
+  margin-top: 10px;
+}
+
+/* Style for folder containers */
+.wb-model-folder-details {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  margin-bottom: 5px;
+  background-color: var(--background-secondary); /* Slightly different background */
+}
+
+/* Style for the clickable folder summary */
+.wb-model-folder-summary {
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex; /* Use flexbox for alignment */
+  align-items: center; /* Vertically align icon and text */
+  gap: 5px; /* Space between icon and text */
+  font-weight: bold;
+  list-style: none; /* Remove default disclosure triangle */
+}
+.wb-model-folder-summary::-webkit-details-marker {
+  display: none; /* Hide default marker in Webkit */
+}
+
+/* Add custom open/close indicator (optional) */
+.wb-model-folder-details > .wb-model-folder-summary::before {
+  content: '▶'; /* Collapsed state */
+  display: inline-block;
+  margin-right: 5px;
+  font-size: 0.8em;
+  transition: transform 0.1s ease-in-out;
+}
+.wb-model-folder-details[open] > .wb-model-folder-summary::before {
+  transform: rotate(90deg); /* Expanded state */
+}
+
+
+/* Indentation and styling for nested content */
+.wb-model-folder-details > .wb-model-folder-details,
+.wb-model-folder-details > .wb-model-file-list {
+  /* Increased margin-left for better visual hierarchy */
+  margin-left: 25px; /* Increased from 20px */
+  padding: 5px 0 5px 10px; /* Add some padding */
+  border-left: 1px dashed var(--background-modifier-border); /* Visual connector */
+  margin-top: 5px;
+  /* Remove the border from the direct child list inside an open folder */
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
+  background-color: transparent; /* Ensure nested folders don't inherit the background */
+}
+
+/* Style for file lists */
+.wb-model-file-list {
+  list-style: none;
+  padding-left: 0; /* Remove default ul padding */
+  margin: 0; /* Remove default ul margin */
+}
+
+/* Style for individual file items */
+.wb-model-file-item {
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  /* Add a small left padding to align files slightly inside their folder's border */
+  padding-left: 10px;
+}
+
+.wb-model-file-icon,
+.wb-model-folder-icon {
+  color: var(--text-muted); /* Dim the icons slightly */
+}
