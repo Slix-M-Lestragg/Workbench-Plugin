@@ -1,6 +1,6 @@
 import type Workbench from './main';
 import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
-import { Notice, TFile } from 'obsidian'; // Import TFile
+import { Notice, TFile, setIcon } from 'obsidian'; // Import TFile and setIcon
 
 /**
  * Registers all Workbench plugin commands.
@@ -75,10 +75,37 @@ export function registerCommands(pluginInstance: Workbench): void {
     });
 
     /**
-     * Ribbon Icon: Launch ComfyUI Script.
-     * @description Adds a toolbar icon that triggers the launch-comfyui-script command.
+     * Ribbon Icon: Launch or Open ComfyUI.
+     * @description Adds a toolbar icon that launches ComfyUI if disconnected/error,
+     * or opens the web UI if ready/busy. The icon changes based on status.
      */
-    pluginInstance.addRibbonIcon('image', 'Launch ComfyUI Script', (evt: MouseEvent) => {
-        launchComfyUI(pluginInstance);
+    // Use a placeholder icon initially, it will be updated immediately by updateRibbonIcon
+    const initialIcon = 'image'; // Or any valid icon name
+    const initialTooltip = 'Loading ComfyUI Status...'; // Placeholder tooltip
+    pluginInstance.ribbonIconEl = pluginInstance.addRibbonIcon(initialIcon, initialTooltip, (evt: MouseEvent) => { // Assign the returned element
+        const status = pluginInstance.currentComfyStatus;
+        const apiUrl = pluginInstance.settings.comfyApiUrl?.trim();
+
+        if (status === 'Ready' || status === 'Busy') {
+            // If connected, open the web UI
+            if (apiUrl) {
+                window.open(apiUrl, '_blank');
+            } else {
+                new Notice("ComfyUI API URL is not set in settings.");
+            }
+            // Tooltip/icon update is handled centrally by updateStatusBar -> updateRibbonIcon
+        } else {
+            // If disconnected, launching, connecting, or error state, attempt to launch
+            launchComfyUI(pluginInstance);
+            // Tooltip/icon update is handled centrally by updateStatusBar -> updateRibbonIcon
+        }
     });
+
+    // Remove the initial tooltip setting here, it's handled in main.ts onload
+    // const initialStatus = pluginInstance.currentComfyStatus;
+    // if (initialStatus === 'Ready' || initialStatus === 'Busy') {
+    //     pluginInstance.ribbonIconEl.ariaLabel = 'Open ComfyUI Web Interface';
+    // } else {
+    //     pluginInstance.ribbonIconEl.ariaLabel = 'Launch ComfyUI';
+    // }
 }

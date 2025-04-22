@@ -1,6 +1,6 @@
 // Imports
 // -------------------------
-import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App } from 'obsidian'; // [obsidian](https://help.obsidian.md)
+import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App, setIcon } from 'obsidian'; // Added setIcon
 import {
     WorkbenchSettings,
     DEFAULT_SETTINGS,
@@ -29,6 +29,7 @@ export default class Workbench extends Plugin {
     settings: WorkbenchSettings;
     comfyApi: ComfyApi | null = null;
     statusBarItemEl: HTMLElement | null = null;
+    ribbonIconEl: HTMLElement | null = null; // Add this line to store the ribbon icon element
     currentComfyStatus: ComfyStatus = 'Disconnected';
     pollingIntervalId: number | null = null;
     pollingRetryCount: number = 0;
@@ -100,6 +101,42 @@ export default class Workbench extends Plugin {
         }
     }
 
+    /** Updates the ribbon icon based on the current ComfyUI status. */
+    public updateRibbonIcon(status: ComfyStatus): void {
+        if (!this.ribbonIconEl) {
+            // Add a warning if the element doesn't exist when this is called
+            console.warn("Workbench: updateRibbonIcon called but this.ribbonIconEl is not set.");
+            return;
+        }
+
+        // Log the attempt to update
+        console.log(`Workbench: Attempting to update ribbon icon. Status: ${status}, Element:`, this.ribbonIconEl);
+
+        let iconName = 'image'; // Default icon (e.g., launch)
+        let tooltip = 'Launch ComfyUI';
+
+        if (status === 'Ready' || status === 'Busy') {
+            iconName = 'workflow'; // Icon for opening the web UI
+            tooltip = 'Open ComfyUI Web Interface';
+            if (!this.settings.comfyApiUrl?.trim()) {
+                tooltip = 'Cannot Open ComfyUI (URL not set)';
+            }
+        } else if (status === 'Connecting' || status === 'Launching') {
+            iconName = 'loader-2'; // Icon for intermediate states
+            tooltip = `ComfyUI: ${status}...`;
+        } else if (status === 'Error') {
+            iconName = 'alert-circle'; // Icon for error state
+            tooltip = 'ComfyUI Error - Click to attempt launch';
+        }
+        // 'Disconnected' uses the default 'image' icon and 'Launch ComfyUI' tooltip
+
+        // Log the icon and tooltip being set
+        console.log(`Workbench: Setting ribbon icon to '${iconName}' with tooltip '${tooltip}'`);
+        setIcon(this.ribbonIconEl, iconName);
+        this.ribbonIconEl.ariaLabel = tooltip;
+    }
+
+
     // Lifecycle Methods
     // -------------------------
     async onload() {
@@ -115,7 +152,10 @@ export default class Workbench extends Plugin {
 
         // Initialize status bar and commands
         setupStatusBar(this);
-        registerCommands(this);
+        registerCommands(this); // This will now set this.ribbonIconEl
+
+        // Initial ribbon icon update after commands are registered
+        this.updateRibbonIcon(this.currentComfyStatus);
 
         // Register the custom JSON view for .json files
         this.registerView(JSON_VIEW_TYPE, (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf));

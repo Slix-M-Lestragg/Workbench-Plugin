@@ -4,18 +4,25 @@ import type { ComfyStatus } from '../comfy/types';
 import { showStatusPopover } from './StatusBarPopover'; // Import the new popover function
 
 /**
- * Updates the plugin's status bar item.
+ * Updates the plugin's status bar item AND the ribbon icon.
  * @param pluginInstance The instance of the Workbench plugin.
  * @param status The new status to display.
- * @param tooltip An optional tooltip message.
+ * @param tooltip An optional tooltip message for the status bar.
  */
 export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, tooltip: string = ''): void {
     const { statusBarItemEl } = pluginInstance;
-    if (!statusBarItemEl) return;
 
-    pluginInstance.currentComfyStatus = status; // Update the status on the plugin instance
+    // Update status on the plugin instance FIRST
+    pluginInstance.currentComfyStatus = status;
+
+    // Update Ribbon Icon (call the new method on the plugin instance)
+    pluginInstance.updateRibbonIcon(status);
+
+    // --- Update Status Bar ---
+    if (!statusBarItemEl) return; // Check if status bar element exists
+
     let icon = 'plug-zap';
-    let text = 'ComfyUI: '; // Keep text for tooltip generation
+    let text = 'ComfyUI: '; // Base text for tooltip generation
 
     switch (status) {
         case 'Disconnected': icon = 'plug-zap'; text += 'Offline'; break;
@@ -37,10 +44,7 @@ export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, 
         iconEl.removeClass('comfy-busy-icon'); // Ensure class is removed for other states
     }
 
-    // Remove the text span creation
-    // statusBarItemEl.createSpan({ text: ` ${text}` });
-
-    // Use the full text for the tooltip
+    // Use the full text for the tooltip, prioritizing the explicit tooltip if provided
     statusBarItemEl.ariaLabel = tooltip || text;
 }
 
@@ -50,10 +54,9 @@ export function updateStatusBar(pluginInstance: Workbench, status: ComfyStatus, 
  */
 export function setupStatusBar(pluginInstance: Workbench): void {
     pluginInstance.statusBarItemEl = pluginInstance.addStatusBarItem();
-    // Initial tooltip reflects the action
-    updateStatusBar(pluginInstance, 'Disconnected', 'ComfyUI: Offline. Click for status & options.'); // Keep tooltip
-    pluginInstance.statusBarItemEl.onClickEvent((event) => { // Keep event for stopPropagation
-        // Pass the status bar element itself for positioning
+    // Initial status bar update (will also call updateRibbonIcon indirectly if needed, though ribbon isn't created yet)
+    updateStatusBar(pluginInstance, 'Disconnected', 'ComfyUI: Offline. Click for status & options.');
+    pluginInstance.statusBarItemEl.onClickEvent((event) => {
         showStatusPopover(pluginInstance, event, pluginInstance.statusBarItemEl || undefined);
     });
 }
