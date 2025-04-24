@@ -11,6 +11,7 @@ import type Workbench from './main';
     export interface DeviceSpecificSettings { // Interface for settings that may vary per device/OS.
         comfyUiPath: string;
         comfyInstallType: ComfyInstallType;
+        modelNotesFolderPath: string; // <--- Add this line
     }
 
     // Main settings interface for the Workbench plugin.
@@ -34,6 +35,7 @@ import type Workbench from './main';
     export const DEFAULT_DEVICE_SETTINGS: DeviceSpecificSettings = { // Default device-specific settings used as fallback.
         comfyUiPath: '',
         comfyInstallType: 'script',
+        modelNotesFolderPath: 'Workbench/Models', // <--- Add default value
     };
     export const DEFAULT_SETTINGS: WorkbenchSettings = { // Default global settings for the Workbench plugin.
         comfyApiUrl: 'http://127.0.0.1:8188',
@@ -166,6 +168,19 @@ export class SampleSettingTab extends PluginSettingTab {
                     .onChange(async (value) => {
                         this.plugin.settings.comfyApiUrl = value;
                         await this.plugin.saveSettings();
+                    }));
+
+            // Add setting for Model Notes Folder Path (Device Specific)
+            new Setting(generalTabContent) // Or place in 'Launch' tab if preferred
+                .setName(`Model Notes Folder (${this.currentOS.toUpperCase()})`)
+                .setDesc('Vault folder to store generated Markdown notes for models (relative to vault root).')
+                .addText(text => text
+                    .setPlaceholder('e.g., Workbench/Models')
+                    .setValue(currentDeviceSettings.modelNotesFolderPath)
+                    .onChange(async (value) => {
+                        // Basic validation: remove leading/trailing slashes and whitespace
+                        const cleanedPath = value.trim().replace(/^\/+|\/$/g, '');
+                        await this.saveCurrentDeviceSetting('modelNotesFolderPath', cleanedPath);
                     }));
 
             // -------------------------
