@@ -1,7 +1,9 @@
-import { ItemView, WorkspaceLeaf, App, setIcon, TFolder, Notice } from 'obsidian'; // <-- Import TFolder and Notice
+import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Menu, Modal } from 'obsidian';
 import * as fs from 'fs'; // Import fs for reading file content
 import * as path from 'path';
 import type Workbench from '../main';
+import { ModelMetadataManager } from '../comfy/metadataManager';
+import { EnhancedModelMetadata } from '../comfy/types';
 
 export const MODEL_LIST_VIEW_TYPE = "comfyui-model-list-view";
 export const MODEL_LIST_ICON = "notebook-tabs"; // Obsidian icon name
@@ -28,11 +30,11 @@ async function findModelsRecursive(dirPath: string, baseModelsPath: string): Pro
                 files.push(relativePath);
             }
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Log errors but continue if possible (e.g., permission denied for a subfolder)
         console.error(`Error reading directory ${dirPath}:`, error);
         // Optionally, re-throw specific critical errors if needed
-        if (error.code === 'ENOENT' && dirPath === baseModelsPath) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT' && dirPath === baseModelsPath) {
              throw error; // Re-throw if the base models directory doesn't exist
         }
     }
@@ -88,6 +90,7 @@ function buildModelTree(filePaths: string[]): ModelTreeNode {
 
 export class ModelListView extends ItemView {
     plugin: Workbench;
+    private metadataManager: ModelMetadataManager | null = null;
 
     constructor(leaf: WorkspaceLeaf, app: App, plugin: Workbench) {
         super(leaf);
@@ -137,48 +140,13 @@ export class ModelListView extends ItemView {
                 filePaths.forEach(fullRelativePath => {
                     const fileName = path.basename(fullRelativePath); // Extract filename for display
                     const fileItemEl = fileListEl.createEl('li', { cls: 'wb-model-file-item' });
-                    const iconEl = fileItemEl.createSpan({ cls: 'wb-model-file-icon' });
-
-                    // --- Determine icon based on file extension ---
-                    const extension = path.extname(fileName).toLowerCase();
-                    let iconName = 'document'; // Default icon
-
-                    if (['.safetensors', '.ckpt', '.model', '.pth', '.pt', '.gguf'].includes(extension)) {
-                        iconName = 'file-sliders'; // AI Model icon
-                    } else if (extension === '.json') {
-                        iconName = 'file-json';
-                    } else if (extension === '.md') {
-                        iconName = 'file-text'; // Changed from file-type as it might not exist
-                    } else if (['.yaml', '.yml'].includes(extension)) {
-                        iconName = 'file-code';
-                    }
-                    // --- End icon determination ---
-                    setIcon(iconEl, iconName); // Use the determined icon
-
-                    // --- Create internal link to the note ---
-                    if (notesFolder) {
-                        const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
-                        const noteSubfolderPath = path.dirname(fullRelativePath);
-                        const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
-                        const linkPath = fullNotePath.replace(/\.md$/, ''); // Path for openLinkText (no extension)
-
-                        const linkEl = fileItemEl.createEl('a', {
-                            cls: 'internal-link wb-model-file-link', // Add internal-link class
-                            text: fileName,
-                            href: '#' // Prevent default navigation
-                        });
-                        linkEl.dataset.href = linkPath; // Store the path for Obsidian
-
-                        // Add click handler to open the note
-                        linkEl.addEventListener('click', (ev) => {
-                            ev.preventDefault(); // Prevent default anchor behavior
-                            this.app.workspace.openLinkText(linkPath, '', false); // Open the note
-                        });
+                    
+                    // Enhance with CivitAI metadata if enabled
+                    if (this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
+                        this.enhanceFileItemWithCivitAI(fileItemEl, fullRelativePath, fileName, notesFolder);
                     } else {
-                        // If notes folder isn't set, just display the text
-                        fileItemEl.createSpan({ text: fileName });
+                        this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
                     }
-                    // --- End internal link creation ---
                 });
                  // Ensure the file list is directly under the parent (which should be details or root)
                  if (parentEl.tagName.toLowerCase() !== 'details') {
@@ -299,6 +267,14 @@ Notes about this model...
     }
 
     async onOpen() {
+        // Initialize metadata manager if CivitAI integration is enabled
+        if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
+            this.metadataManager = new ModelMetadataManager(
+                this.app.vault,
+                this.plugin.settings.civitaiApiKey
+            );
+        }
+
         const container = this.contentEl;
         container.empty();
         container.addClass('wb-model-list-view'); // Add a class for potential styling
@@ -357,13 +333,14 @@ Notes about this model...
                 const treeRootEl = container.createDiv({ cls: 'wb-model-tree-root' });
                 this.renderModelTree(modelTree, treeRootEl); // Start rendering the tree
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             loadingEl.remove(); // Remove loading message
             console.error(`Error scanning models directory (${modelsPath}):`, error);
-            if (error.code === 'ENOENT') {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
                 container.createEl("p", { cls: 'wb-error-text', text: `Error: Base models directory not found at '${modelsPath}'. Please check your ComfyUI path settings.` });
             } else {
-                container.createEl("p", { cls: 'wb-error-text', text: `Error scanning models directory: ${error.message}` });
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                container.createEl("p", { cls: 'wb-error-text', text: `Error scanning models directory: ${errorMessage}` });
             }
         }
     }
@@ -371,5 +348,297 @@ Notes about this model...
     async onClose() {
         // Clean up view content
         this.contentEl.empty();
+    }
+
+    private renderBasicFileItem(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): void {
+        const iconEl = fileItemEl.createSpan({ cls: 'wb-model-file-icon' });
+
+        // --- Determine icon based on file extension ---
+        const extension = path.extname(fileName).toLowerCase();
+        let iconName = 'document'; // Default icon
+
+        if (['.safetensors', '.ckpt', '.model', '.pth', '.pt', '.gguf'].includes(extension)) {
+            iconName = 'file-sliders'; // AI Model icon
+        } else if (extension === '.json') {
+            iconName = 'file-json';
+        } else if (extension === '.md') {
+            iconName = 'file-text';
+        } else if (['.yaml', '.yml'].includes(extension)) {
+            iconName = 'file-code';
+        }
+        setIcon(iconEl, iconName);
+
+        // --- Create internal link to the note ---
+        if (notesFolder) {
+            const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
+            const noteSubfolderPath = path.dirname(fullRelativePath);
+            const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
+            const linkPath = fullNotePath.replace(/\.md$/, ''); // Path for openLinkText (no extension)
+
+            const linkEl = fileItemEl.createEl('a', {
+                cls: 'internal-link wb-model-file-link',
+                text: fileName,
+                href: '#'
+            });
+            linkEl.dataset.href = linkPath;
+
+            linkEl.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                this.app.workspace.openLinkText(linkPath, '', false);
+            });
+        } else {
+            fileItemEl.createSpan({ text: fileName });
+        }
+    }
+
+    private async enhanceFileItemWithCivitAI(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): Promise<void> {
+        if (!this.metadataManager) return this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+
+        try {
+            const deviceSettings = this.plugin.getCurrentDeviceSettings();
+            const comfyPath = deviceSettings.comfyUiPath?.trim();
+            if (!comfyPath) return this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+
+            const fullModelPath = path.join(comfyPath, 'models', fullRelativePath);
+            
+            // Start with basic rendering
+            this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+
+            // Enhance with CivitAI data asynchronously
+            const metadata = await this.metadataManager.enrichModelMetadata(fullModelPath);
+            
+            // Add verification badge
+            if (metadata.isVerified && this.plugin.settings.showCivitaiRatings) {
+                const verifiedBadge = fileItemEl.createEl('span', {
+                    cls: 'wb-verified-badge',
+                    text: '✓'
+                });
+                verifiedBadge.title = 'Verified on CivitAI';
+            }
+
+            // Add model type badge
+            if (metadata.civitaiModel) {
+                fileItemEl.createEl('span', {
+                    cls: `wb-model-type-${metadata.civitaiModel.type.toLowerCase()}`,
+                    text: metadata.civitaiModel.type
+                });
+            }
+
+            // Add rating if available
+            if (metadata.civitaiModel?.stats.rating && this.plugin.settings.showCivitaiRatings) {
+                fileItemEl.createEl('span', {
+                    cls: 'wb-model-rating',
+                    text: `★${metadata.civitaiModel.stats.rating.toFixed(1)}`
+                });
+            }
+
+            // Enhanced context menu
+            fileItemEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showEnhancedContextMenu(e, fullModelPath, metadata);
+            });
+
+            // Add tooltip with model info
+            fileItemEl.title = this.generateModelTooltip(metadata);
+
+        } catch (error) {
+            console.error('Failed to enhance file item with CivitAI data:', error);
+        }
+    }
+
+    private showEnhancedContextMenu(event: MouseEvent, filePath: string, metadata: EnhancedModelMetadata): void {
+        const menu = new Menu();
+
+        // Basic actions
+        menu.addItem((item) => {
+            item.setTitle("Copy Path")
+                .setIcon("copy")
+                .onClick(() => navigator.clipboard.writeText(metadata.localPath));
+        });
+
+        if (metadata.civitaiModel) {
+            menu.addSeparator();
+
+            menu.addItem((item) => {
+                item.setTitle("View on CivitAI")
+                    .setIcon("external-link")
+                    .onClick(() => {
+                        if (metadata.civitaiModel?.id) {
+                            window.open(`https://civitai.com/models/${metadata.civitaiModel.id}`, '_blank');
+                        }
+                    });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("Show Model Details")
+                    .setIcon("info")
+                    .onClick(() => {
+                        this.showModelDetailsModal(metadata);
+                    });
+            });
+
+            if (this.plugin.settings.showCompatibleModels) {
+                menu.addItem((item) => {
+                    item.setTitle("Find Compatible Models")
+                        .setIcon("git-branch")
+                        .onClick(async () => {
+                            await this.showCompatibleModels(filePath);
+                        });
+                });
+            }
+
+            if (metadata.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
+                menu.addItem((item) => {
+                    item.setTitle("Copy Trigger Words")
+                        .setIcon("copy")
+                        .onClick(() => {
+                            if (metadata.civitaiVersion?.trainedWords) {
+                                navigator.clipboard.writeText(metadata.civitaiVersion.trainedWords.join(', '));
+                                new Notice('Trigger words copied to clipboard');
+                            }
+                        });
+                });
+            }
+        }
+
+        menu.addItem((item) => {
+            item.setTitle("Refresh Metadata")
+                .setIcon("refresh-cw")
+                .onClick(async () => {
+                    if (this.metadataManager) {
+                        await this.metadataManager.refreshMetadata(filePath);
+                        this.refresh();
+                    }
+                });
+        });
+
+        menu.showAtMouseEvent(event);
+    }
+
+    private generateModelTooltip(metadata: EnhancedModelMetadata): string {
+        let tooltip = `File: ${metadata.filename}`;
+        
+        if (metadata.civitaiModel) {
+            tooltip += `\nModel: ${metadata.civitaiModel.name}`;
+            tooltip += `\nType: ${metadata.civitaiModel.type}`;
+            tooltip += `\nBase Model: ${metadata.relationships.baseModel}`;
+            tooltip += `\nRating: ${metadata.civitaiModel.stats.rating?.toFixed(1) || 'N/A'}`;
+            tooltip += `\nDownloads: ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}`;
+            
+            if (metadata.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
+                tooltip += `\nTrigger Words: ${metadata.civitaiVersion.trainedWords.join(', ')}`;
+            }
+        }
+
+        return tooltip;
+    }
+
+    private async showCompatibleModels(filePath: string): Promise<void> {
+        if (!this.metadataManager) return;
+
+        const relationships = await this.metadataManager.getModelRelationships(filePath);
+        
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Compatible Models');
+        
+        const container = modal.contentEl.createDiv({ cls: 'wb-compatible-models' });
+        
+        if (relationships.length === 0) {
+            container.createEl('p', { text: 'No compatible local models found.' });
+        } else {
+            relationships.forEach(related => {
+                const item = container.createDiv({ cls: 'wb-compatible-item' });
+                item.createEl('strong', { text: related.civitaiModel?.name || related.filename });
+                item.createEl('span', { text: ` (${related.civitaiModel?.type || 'Unknown'})` });
+                
+                if (related.civitaiModel?.stats.rating) {
+                    item.createEl('span', { 
+                        cls: 'wb-rating',
+                        text: ` ★${related.civitaiModel.stats.rating.toFixed(1)}` 
+                    });
+                }
+                
+                item.addEventListener('click', () => {
+                    modal.close();
+                });
+            });
+        }
+        
+        modal.open();
+    }
+
+    private showModelDetailsModal(metadata: EnhancedModelMetadata): void {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(metadata.civitaiModel?.name || metadata.filename);
+        
+        const container = modal.contentEl.createDiv({ cls: 'wb-model-details' });
+        
+        if (metadata.civitaiModel) {
+            // Model header
+            const header = container.createDiv({ cls: 'wb-model-header' });
+            header.createEl('h3', { text: metadata.civitaiModel.name });
+            header.createEl('span', { 
+                cls: 'wb-model-type',
+                text: metadata.civitaiModel.type 
+            });
+            
+            // Stats
+            const stats = container.createDiv({ cls: 'wb-model-stats' });
+            stats.createEl('span', { text: `★ ${metadata.civitaiModel.stats.rating?.toFixed(1) || 'N/A'}` });
+            stats.createEl('span', { text: `↓ ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}` });
+            stats.createEl('span', { text: `♥ ${metadata.civitaiModel.stats.favoriteCount.toLocaleString()}` });
+            
+            // Description
+            if (metadata.civitaiModel.description) {
+                container.createEl('p', { text: metadata.civitaiModel.description });
+            }
+            
+            // Version info
+            if (metadata.civitaiVersion) {
+                const versionInfo = container.createDiv({ cls: 'wb-version-info' });
+                versionInfo.createEl('h4', { text: 'Version Information' });
+                versionInfo.createEl('p', { text: `Version: ${metadata.civitaiVersion.name}` });
+                versionInfo.createEl('p', { text: `Base Model: ${metadata.civitaiVersion.baseModel}` });
+                
+                if (metadata.civitaiVersion.trainedWords?.length > 0) {
+                    versionInfo.createEl('p', { text: `Trigger Words: ${metadata.civitaiVersion.trainedWords.join(', ')}` });
+                }
+            }
+            
+            // Tags
+            if (metadata.civitaiModel.tags?.length > 0) {
+                const tagsDiv = container.createDiv({ cls: 'wb-model-tags' });
+                tagsDiv.createEl('h4', { text: 'Tags' });
+                const tagsList = tagsDiv.createEl('div', { cls: 'wb-tags-list' });
+                metadata.civitaiModel.tags.forEach(tag => {
+                    tagsList.createEl('span', { cls: 'wb-tag', text: tag });
+                });
+            }
+        }
+        
+        modal.open();
+    }
+
+    public refresh(): void {
+        this.onOpen();
+    }
+
+    public async refreshWithMetadata(): Promise<void> {
+        if (this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
+            await this.metadataManager.refreshAllMetadata();
+        }
+        this.onOpen();
+    }
+
+    public updateCivitAISettings(): void {
+        // Reinitialize metadata manager when settings change
+        if (this.plugin.settings.enableCivitaiIntegration) {
+            this.metadataManager = new ModelMetadataManager(
+                this.app.vault,
+                this.plugin.settings.civitaiApiKey
+            );
+        } else {
+            this.metadataManager = null;
+        }
     }
 }

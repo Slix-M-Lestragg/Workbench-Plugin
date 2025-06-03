@@ -1,0 +1,32 @@
+{
+  "prompt_categories": {
+    "quality_and_resolution": "(masterpiece,best quality,highres,newest,absurdres), (high contrast)",
+    "environment_and_pose": "indoors, standing",
+    "emotional_state": "embarrassed, horny, lustful",
+    "character_base": "2futas, fishnet clothed futanary, nightgown",
+    "physical_features": "pink eyes, disheveled hair, white hair, small breasts",
+    "sexual_content": "sex from behind, undressed, dripping",
+    "body_positioning": "arched back, off shoulder, bare shoulder",
+    "exposed_anatomy": "erect penis, exposed breasts, exposed body, exposed nipples, perky breast, small breast, teardrop shaped breasts, torpedo breast, pink nipples",
+    "bondage_elements": "hands tied up, hands above head, legs tied up, suspended, suspension, legs above waist, tied upwards, suspension on air, legs tied together"
+  },
+  "negative_prompt": "worst quality,bad quality, child, young, watermark, username,early, low quality, lowres, signature, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral,monochrome, man, boy, greyscale,eyewear,glasses,",
+  "generation_parameters": {
+    "steps": 19,
+    "cfg_scale": 5,
+    "sampler": "Euler a",
+    "seed": 1576426811,
+    "extra": "[object Object]",
+    "size": "832x1216",
+    "width": 832,
+    "height": 1216,
+    "quantity": 8,
+    "workflow": "txt2img",
+    "base_model": "Illustrious",
+    "created_date": "2025-05-22T1707:32.5062763Z",
+    "clip_skip": 2,
+    "nsfw": false,
+    "draft": false
+  },
+  "full_positive_prompt": "(masterpiece,best quality,highres,newest,absurdres), (high contrast), indoors, standing, embarrassed, horny, lustful, 2futas, fishnet clothed futanary, nightgown, pink eyes, disheveled hair, white hair, small breasts, sex from behind, undressed, dripping, arched back, off shoulder, bare shoulder, erect penis, exposed breasts, exposed body, exposed nipples, perky breast, small breast, teardrop shaped breasts, torpedo breast, pink nipples, hands tied up, hands above head, legs tied up, suspended, suspension, legs above waist, tied upwards, suspension on air, legs tied together"
+}

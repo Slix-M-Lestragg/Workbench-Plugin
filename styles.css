@@ -328,3 +328,299 @@
 .wb-model-folder-icon {
   color: var(--text-muted); /* Dim the icons slightly */
 }
+
+/* ===========================================================================
+   5. CivitAI Integration Styles
+   =========================================================================== */
+
+/* Verified badge */
+.wb-verified-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-left: 6px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+/* Model type badges */
+.wb-model-type-checkpoint,
+.wb-model-type-lora,
+.wb-model-type-textualinversion,
+.wb-model-type-hypernetwork,
+.wb-model-type-aestheticgradient,
+.wb-model-type-controlnet,
+.wb-model-type-poses {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-left: 4px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.wb-model-type-checkpoint {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.wb-model-type-lora {
+    background-color: #10b981;
+    color: white;
+}
+
+.wb-model-type-textualinversion {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.wb-model-type-hypernetwork {
+    background-color: #8b5cf6;
+    color: white;
+}
+
+.wb-model-type-aestheticgradient {
+    background-color: #ec4899;
+    color: white;
+}
+
+.wb-model-type-controlnet {
+    background-color: #ef4444;
+    color: white;
+}
+
+.wb-model-type-poses {
+    background-color: #6b7280;
+    color: white;
+}
+
+/* Model rating display */
+.wb-model-rating {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-left: 4px;
+    background-color: var(--background-modifier-border);
+    color: var(--text-accent);
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+/* Enhanced file item layout */
+.wb-model-file-item {
+    position: relative;
+    padding: 4px 0;
+}
+
+.wb-model-file-item:hover {
+    background-color: var(--background-modifier-hover);
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+/* Model details modal */
+.wb-model-details {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.wb-model-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.wb-model-header h3 {
+    margin: 0;
+    color: var(--text-normal);
+}
+
+.wb-model-type {
+    padding: 4px 8px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.wb-model-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background-color: var(--background-secondary);
+    border-radius: 6px;
+}
+
+.wb-model-stats span {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.wb-version-info {
+    margin: 16px 0;
+    padding: 12px;
+    background-color: var(--background-secondary);
+    border-radius: 6px;
+}
+
+.wb-version-info h4 {
+    margin: 0 0 8px 0;
+    color: var(--text-normal);
+}
+
+.wb-version-info p {
+    margin: 4px 0;
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* Model tags */
+.wb-model-tags {
+    margin-top: 16px;
+}
+
+.wb-model-tags h4 {
+    margin: 0 0 8px 0;
+    color: var(--text-normal);
+}
+
+.wb-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.wb-tag {
+    padding: 3px 8px;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 400;
+}
+
+/* Compatible models display */
+.wb-compatible-models {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.wb-compatible-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.wb-compatible-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.wb-compatible-item strong {
+    color: var(--text-normal);
+    margin-right: 6px;
+}
+
+.wb-rating {
+    color: var(--text-accent);
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+/* Loading and error states */
+.wb-loading-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+    border-radius: 3px;
+    font-size: 0.7em;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.wb-error-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    background-color: var(--text-error);
+    color: white;
+    border-radius: 3px;
+    font-size: 0.7em;
+}
+
+/* Context menu enhancements */
+.menu .menu-item[data-civitai="true"] {
+    border-top: 1px solid var(--background-modifier-border);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+/* Settings section for CivitAI */
+.wb-civitai-settings {
+    margin: 16px 0;
+    padding: 16px;
+    background-color: var(--background-secondary);
+    border-radius: 6px;
+}
+
+.wb-civitai-settings h3 {
+    margin: 0 0 12px 0;
+    color: var(--text-normal);
+    font-size: 1.1em;
+}
+
+.wb-civitai-settings .setting-item {
+    margin: 8px 0;
+}
+
+.wb-civitai-settings .setting-item-description {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin-top: 4px;
+}
+
+/* API key input styling */
+.wb-api-key-input {
+    font-family: var(--font-monospace);
+    letter-spacing: 0.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .wb-model-details {
+        max-width: 90vw;
+    }
+    
+    .wb-model-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .wb-model-stats {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .wb-tags-list {
+        gap: 4px;
+    }
+}

@@ -33,20 +33,20 @@ export default class Workbench extends Plugin {
     ribbonIconEl: HTMLElement | null = null; // Add this line to store the ribbon icon element
     currentComfyStatus: ComfyStatus = 'Disconnected';
     pollingIntervalId: number | null = null;
-    pollingRetryCount: number = 0;
+    pollingRetryCount = 0;
     pollingRetryTimeoutId: number | null = null;
     app: App; // Provided by obsidian
     currentOS: OperatingSystem; // Determined on load
 
     // Crystools / System monitoring properties
     latestSystemStats: SystemStats | null = null;
-    systemMonitorListener: ((ev: CustomEvent<any>) => void) | null = null;
+    systemMonitorListener: ((ev: CustomEvent<unknown>) => void) | null = null;
 
     // Workflow execution progress properties
     currentRunningPromptId: string | null = null;
     currentProgressValue: number | null = null;
     currentProgressMax: number | null = null;
-    progressListener: ((ev: CustomEvent<any>) => void) | null = null;
+    progressListener: ((ev: CustomEvent<unknown>) => void) | null = null;
 
     
 // Public Methods Exposed to Other Modules
@@ -142,7 +142,6 @@ export default class Workbench extends Plugin {
     // -------------------------
     async onload() {
         // Initialize OS and settings
-        this.app = this.app;
         this.currentOS = getCurrentOS();
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -294,8 +293,9 @@ export default class Workbench extends Plugin {
         this.stopPolling();
         if (this.comfyApi) {
             try {
-                if (typeof (this.comfyApi as any).close === 'function') {
-                    (this.comfyApi as any).close();
+                const comfyApiWithClose = this.comfyApi as ComfyApi & { close?: () => void };
+                if (typeof comfyApiWithClose.close === 'function') {
+                    comfyApiWithClose.close();
                     console.log("Closed ComfyUI WebSocket connection on unload.");
                 }
             } catch (e) {
@@ -317,7 +317,7 @@ export default class Workbench extends Plugin {
         // Merge top-level settings
         for (const key in mergedSettings) {
             if (key !== 'deviceSettings' && loadedData && loadedData.hasOwnProperty(key)) {
-                (mergedSettings as any)[key] = loadedData[key];
+                (mergedSettings as Record<string, unknown>)[key] = loadedData[key];
             }
         }
 
@@ -357,11 +357,26 @@ export default class Workbench extends Plugin {
     async saveSettings() {
         const settingsToSave = { ...this.settings };
         if (settingsToSave.hasOwnProperty('comfyUiPath')) {
-            delete (settingsToSave as any).comfyUiPath;
+            delete (settingsToSave as Record<string, unknown>).comfyUiPath;
         }
         if (settingsToSave.hasOwnProperty('comfyInstallType')) {
-            delete (settingsToSave as any).comfyInstallType;
+            delete (settingsToSave as Record<string, unknown>).comfyInstallType;
         }
         await this.saveData(settingsToSave);
+        
+        // Update model list views when CivitAI settings change
+        this.updateModelListViewSettings();
+    }
+
+    /** Updates all open ModelListView instances with current CivitAI settings.
+     */
+    private updateModelListViewSettings(): void {
+        const modelListLeaves = this.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
+        modelListLeaves.forEach(leaf => {
+            const view = leaf.view;
+            if ('updateCivitAISettings' in view && typeof view.updateCivitAISettings === 'function') {
+                (view as { updateCivitAISettings: () => void }).updateCivitAISettings();
+            }
+        });
     }
 }

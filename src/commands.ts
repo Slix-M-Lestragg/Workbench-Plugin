@@ -1,7 +1,8 @@
 import type Workbench from './main';
 import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
-import { Notice, TFile, setIcon } from 'obsidian'; // Import TFile and setIcon
+import { Notice, TFile } from 'obsidian'; // Import TFile
 import { MODEL_LIST_VIEW_TYPE } from './ui/ModelListView'; // Added import for view type
+import { testCivitAIIntegration } from './comfy/testIntegration'; // Import CivitAI test function
 
 /**
  * Registers all Workbench plugin commands.
@@ -100,6 +101,47 @@ export function registerCommands(pluginInstance: Workbench): void {
             pluginInstance.app.workspace.revealLeaf(
                 pluginInstance.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE)[0]
             );
+        },
+    });
+
+    /**
+     * Command: Test CivitAI Integration.
+     * @id test-civitai-integration
+     * @description Tests the CivitAI API connection and search functionality.
+     */
+    pluginInstance.addCommand({
+        id: 'test-civitai-integration',
+        name: 'Test CivitAI Integration',
+        callback: async () => {
+            await testCivitAIIntegration(pluginInstance.settings.civitaiApiKey);
+        },
+    });
+
+    /**
+     * Command: Refresh CivitAI Metadata.
+     * @id refresh-civitai-metadata
+     * @description Refreshes all CivitAI metadata for models.
+     */
+    pluginInstance.addCommand({
+        id: 'refresh-civitai-metadata',
+        name: 'Refresh CivitAI Metadata',
+        checkCallback: (checking: boolean) => {
+            if (!pluginInstance.settings.enableCivitaiIntegration) return false;
+            
+            if (!checking) {
+                // Find the model list view and refresh it with metadata
+                const modelListLeaves = pluginInstance.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
+                if (modelListLeaves.length > 0) {
+                    const modelListView = modelListLeaves[0].view;
+                    if ('refreshWithMetadata' in modelListView && typeof modelListView.refreshWithMetadata === 'function') {
+                        (modelListView as { refreshWithMetadata: () => Promise<void> }).refreshWithMetadata();
+                        new Notice('Refreshing CivitAI metadata...');
+                    }
+                } else {
+                    new Notice('No model list view open. Please open ComfyUI Models first.');
+                }
+            }
+            return true;
         },
     });
 

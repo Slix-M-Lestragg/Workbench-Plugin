@@ -25,6 +25,14 @@ import type Workbench from './main';
         pollingRetryAttempts: number;
         pollingRetryDelaySeconds: number;
 
+        // CivitAI Integration settings
+        civitaiApiKey?: string;
+        enableCivitaiIntegration: boolean;
+        autoRefreshMetadata: boolean;
+        civitaiCacheExpiry: number; // days
+        showCivitaiRatings: boolean;
+        showCompatibleModels: boolean;
+
         // Device-specific settings keyed by operating system
         deviceSettings: Record<OperatingSystem, Partial<DeviceSpecificSettings>>;
     }
@@ -45,6 +53,14 @@ import type Workbench from './main';
         enablePollingRetry: true,
         pollingRetryAttempts: 3,
         pollingRetryDelaySeconds: 10,
+        
+        // CivitAI Integration defaults
+        enableCivitaiIntegration: true,
+        autoRefreshMetadata: false,
+        civitaiCacheExpiry: 7,
+        showCivitaiRatings: true,
+        showCompatibleModels: true,
+        
         deviceSettings: {
             macos: {},
             windows: {},
@@ -79,7 +95,7 @@ import type Workbench from './main';
 */
 export class SampleSettingTab extends PluginSettingTab {
     plugin: Workbench;
-    activeTab: string = 'general'; // Track the current active tab
+    activeTab = 'general'; // Track the current active tab
     currentOS: OperatingSystem; // Detected operating system for this device
 
     /** Constructor. Detects current OS and initializes the tab.
@@ -182,6 +198,65 @@ export class SampleSettingTab extends PluginSettingTab {
                         const cleanedPath = value.trim().replace(/^\/+|\/$/g, '');
                         await this.saveCurrentDeviceSetting('modelNotesFolderPath', cleanedPath);
                     }));
+
+            // CivitAI Integration Section
+            generalTabContent.createEl('h3', { text: 'CivitAI Integration' });
+
+            new Setting(generalTabContent)
+                .setName('Enable CivitAI Integration')
+                .setDesc('Enable integration with CivitAI for enhanced model metadata')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.enableCivitaiIntegration)
+                    .onChange(async (value) => {
+                        this.plugin.settings.enableCivitaiIntegration = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('CivitAI API Key')
+                .setDesc('Optional API key for CivitAI (enables higher rate limits and access to private models)')
+                .addText(text => text
+                    .setPlaceholder('Enter your CivitAI API key')
+                    .setValue(this.plugin.settings.civitaiApiKey || '')
+                    .onChange(async (value) => {
+                        this.plugin.settings.civitaiApiKey = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('Auto-refresh Metadata')
+                .setDesc('Automatically refresh model metadata from CivitAI weekly')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.autoRefreshMetadata)
+                    .onChange(async (value) => {
+                        this.plugin.settings.autoRefreshMetadata = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('Show CivitAI Ratings')
+                .setDesc('Display model ratings from CivitAI in the models list')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.showCivitaiRatings)
+                    .onChange(async (value) => {
+                        this.plugin.settings.showCivitaiRatings = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('Show Compatible Models')
+                .setDesc('Show suggestions for compatible models (LoRAs for checkpoints, etc.)')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.showCompatibleModels)
+                    .onChange(async (value) => {
+                        this.plugin.settings.showCompatibleModels = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
 
             // -------------------------
             // Populate Launch Tab (Device-Specific Settings)

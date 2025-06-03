@@ -74,7 +74,7 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
     let command = '';
     let useExec = false; // Flag to determine whether to use exec or shell.openPath
     let scriptName = ''; // For user feedback
-    let execOptions: { cwd?: string } = {}; // Options for exec, specifically cwd
+    const execOptions: { cwd?: string } = {}; // Options for exec, specifically cwd
 
     if (installType === 'script' || installType === 'portable') {
         // --- Script or Portable Launch --- 

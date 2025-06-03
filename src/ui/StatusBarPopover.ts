@@ -1,7 +1,7 @@
-import { App, Setting, ButtonComponent } from 'obsidian';
+import { ButtonComponent } from 'obsidian';
 import type Workbench from '../main';
-import type { ComfyStatus, SystemStats, QueueInfo } from '../comfy/types';
-import { createPopper, Instance as PopperInstance, Placement } from '@popperjs/core'; // Import Popper.js
+import type { SystemStats, QueueInfo } from '../comfy/types';
+import { createPopper, Instance as PopperInstance } from '@popperjs/core'; // Import Popper.js
 
 let popoverEl: HTMLElement | null = null;
 let refreshIntervalId: number | null = null;
@@ -240,7 +240,7 @@ async function renderPopoverContent(containerEl: HTMLElement, plugin: Workbench)
 
             // Show running item details only if progress bar isn't already showing it
             if (runningCount > 0 && !runningPromptId) {
-                const runningItem = queueInfo.queue_running[0];
+                const runningItem = queueInfo.queue_running[0] as [unknown, string, ...unknown[]] | undefined;
                 queueRow.createSpan({ cls: 'wb-stat-spacer' });
                 queueRow.createSpan({ cls: 'wb-stat-label', text: 'Run:' });
                 queueRow.createSpan({ cls: 'wb-stat-value wb-prompt-id', text: `#${runningItem?.[1] ?? '?'}` });
