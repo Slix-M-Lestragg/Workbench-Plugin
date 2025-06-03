@@ -9,26 +9,60 @@ export const MODEL_LIST_VIEW_TYPE = "comfyui-model-list-view";
 export const MODEL_LIST_ICON = "notebook-tabs"; // Obsidian icon name
 
 /**
- * Recursively finds all files within a directory and its subdirectories.
+ * Determines if a file is a model file based on its extension.
+ * @param filename The filename to check.
+ * @returns True if the file is considered a model file.
+ */
+function isModelFile(filename: string): boolean {
+    const extension = path.extname(filename).toLowerCase();
+    const modelExtensions = [
+        '.safetensors', '.ckpt', '.pth', '.pt', '.gguf', '.model',
+        '.bin', '.h5', '.onnx', '.tflite', '.pb', '.trt'
+    ];
+    return modelExtensions.includes(extension);
+}
+
+/**
+ * Recursively finds all model files within a directory and its subdirectories.
+ * Also gathers information about related files in the same directories for note generation.
  * @param dirPath The absolute path to the directory to search.
  * @param baseModelsPath The absolute path to the root 'models' directory, used for calculating relative paths.
- * @returns A promise that resolves to an array of relative file paths.
+ * @returns A promise that resolves to an object containing model files and directory info.
  */
-async function findModelsRecursive(dirPath: string, baseModelsPath: string): Promise<string[]> {
-    let files: string[] = [];
+async function findModelsRecursive(dirPath: string, baseModelsPath: string): Promise<{
+    modelFiles: string[];
+    directoryInfo: Record<string, string[]>;
+}> {
+    let modelFiles: string[] = [];
+    const directoryInfo: Record<string, string[]> = {};
+    
     try {
         const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+        const currentDirRelative = path.relative(baseModelsPath, dirPath);
+        const filesInDir: string[] = [];
+        
         for (const entry of entries) {
             const fullPath = path.join(dirPath, entry.name);
             if (entry.isDirectory() && !entry.name.startsWith('.')) {
                 // Recursively search subdirectories
-                const subFiles = await findModelsRecursive(fullPath, baseModelsPath);
-                files = files.concat(subFiles);
+                const subResult = await findModelsRecursive(fullPath, baseModelsPath);
+                modelFiles = modelFiles.concat(subResult.modelFiles);
+                Object.assign(directoryInfo, subResult.directoryInfo);
             } else if (entry.isFile() && !entry.name.startsWith('.')) {
-                // Calculate path relative to the base 'models' directory
-                const relativePath = path.relative(baseModelsPath, fullPath);
-                files.push(relativePath);
+                // Track all files in this directory for note generation
+                filesInDir.push(entry.name);
+                
+                // Only add to modelFiles if it's actually a model
+                if (isModelFile(entry.name)) {
+                    const relativePath = path.relative(baseModelsPath, fullPath);
+                    modelFiles.push(relativePath);
+                }
             }
+        }
+        
+        // Store directory info for note generation (only if there are files)
+        if (filesInDir.length > 0) {
+            directoryInfo[currentDirRelative || '.'] = filesInDir;
         }
     } catch (error: unknown) {
         // Log errors but continue if possible (e.g., permission denied for a subfolder)
@@ -38,7 +72,7 @@ async function findModelsRecursive(dirPath: string, baseModelsPath: string): Pro
              throw error; // Re-throw if the base models directory doesn't exist
         }
     }
-    return files;
+    return { modelFiles, directoryInfo };
 }
 
 // --- Type definition for the nested tree structure ---
@@ -178,8 +212,9 @@ export class ModelListView extends ItemView {
      * Handles specific content generation for .md and .json files.
      * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
      * @param modelsBasePath Absolute path to the root ComfyUI 'models' directory.
+     * @param directoryInfo Information about all files in each directory for enhanced note content.
      */
-    async createModelNoteIfNeeded(relativeModelPath: string, modelsBasePath: string): Promise<void> { // Added modelsBasePath
+    async createModelNoteIfNeeded(relativeModelPath: string, modelsBasePath: string, directoryInfo: Record<string, string[]>): Promise<void> {
         const deviceSettings = this.plugin.getCurrentDeviceSettings();
         const notesFolder = deviceSettings.modelNotesFolderPath?.trim();
 
@@ -216,7 +251,7 @@ export class ModelListView extends ItemView {
                         console.error(`Error reading source Markdown file ${sourceModelFullPath}:`, readError);
                         new Notice(`Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
                         // Fallback to default frontmatter if reading fails
-                        noteContent = this.generateDefaultFrontmatter(relativeModelPath);
+                        noteContent = this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
                     }
                     // --- End Markdown Handling ---
 
@@ -231,7 +266,7 @@ export class ModelListView extends ItemView {
 
                 } else {
                     // --- Handle Other File Types (Default Frontmatter) ---
-                    noteContent = this.generateDefaultFrontmatter(relativeModelPath);
+                    noteContent = this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
                     // --- End Default Handling ---
                 }
 
@@ -247,12 +282,19 @@ export class ModelListView extends ItemView {
     /**
      * Generates default frontmatter content for a model note.
      * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
+     * @param directoryInfo Information about all files in each directory.
      * @returns A string containing the default note content with frontmatter.
      */
-    generateDefaultFrontmatter(relativeModelPath: string): string {
+    generateDefaultFrontmatter(relativeModelPath: string, directoryInfo?: Record<string, string[]>): string {
         const modelFilename = path.basename(relativeModelPath);
-        const modelType = 'unknown'; // Placeholder
-        return `---
+        const modelDirectory = path.dirname(relativeModelPath);
+        const modelType = this.inferModelType(relativeModelPath);
+        
+        // Get related files in the same directory
+        const relatedFiles = directoryInfo?.[modelDirectory] || [];
+        const otherFiles = relatedFiles.filter(file => file !== modelFilename && !isModelFile(file));
+        
+        let frontmatter = `---
 # Basic model information (Workbench Generated)
 model_path: "${relativeModelPath.replace(/\\/g, '/')}"
 model_filename: "${modelFilename}"
@@ -264,6 +306,71 @@ tags: [workbench-model]
 
 Notes about this model...
 `;
+
+        // Add information about related files if any exist
+        if (otherFiles.length > 0) {
+            frontmatter += `\n## Related Files
+
+This model is part of a package that includes the following additional files:
+
+`;
+            otherFiles.forEach(file => {
+                const fileExt = path.extname(file).toLowerCase();
+                let fileType = 'Unknown';
+                if (['.md', '.txt', '.readme'].some(ext => file.toLowerCase().includes(ext))) {
+                    fileType = 'Documentation';
+                } else if (['.json'].includes(fileExt)) {
+                    fileType = 'Configuration';
+                } else if (['.yaml', '.yml'].includes(fileExt)) {
+                    fileType = 'Configuration';
+                } else if (['.py', '.ipynb'].includes(fileExt)) {
+                    fileType = 'Code/Script';
+                } else if (['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt)) {
+                    fileType = 'Sample Image';
+                }
+                
+                frontmatter += `- **${file}** (${fileType})\n`;
+            });
+        }
+
+        return frontmatter;
+    }
+
+    /**
+     * Infers the model type based on the file path and extension.
+     * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
+     * @returns A string indicating the inferred model type.
+     */
+    private inferModelType(relativeModelPath: string): string {
+        const pathParts = relativeModelPath.split('/');
+        const extension = path.extname(relativeModelPath).toLowerCase();
+        
+        // Infer from directory structure
+        if (pathParts.includes('checkpoints')) return 'Checkpoint';
+        if (pathParts.includes('loras')) return 'LoRA';
+        if (pathParts.includes('embeddings')) return 'Embedding';
+        if (pathParts.includes('vae')) return 'VAE';
+        if (pathParts.includes('upscale_models')) return 'Upscaler';
+        if (pathParts.includes('controlnet')) return 'ControlNet';
+        if (pathParts.includes('clip')) return 'CLIP';
+        if (pathParts.includes('unet')) return 'UNet';
+        if (pathParts.includes('LLM')) return 'Large Language Model';
+        
+        // Infer from file extension
+        switch (extension) {
+            case '.safetensors':
+            case '.ckpt':
+                return 'Neural Network Model';
+            case '.pth':
+            case '.pt':
+                return 'PyTorch Model';
+            case '.gguf':
+                return 'GGUF Model';
+            case '.onnx':
+                return 'ONNX Model';
+            default:
+                return 'AI Model';
+        }
     }
 
     async onOpen() {
@@ -278,7 +385,54 @@ Notes about this model...
         const container = this.contentEl;
         container.empty();
         container.addClass('wb-model-list-view'); // Add a class for potential styling
-        container.createEl("h4", { text: "ComfyUI Models" });
+        
+        // Create header with title and refresh button
+        const headerEl = container.createDiv({ cls: 'wb-model-list-header' });
+        headerEl.createEl("h4", { text: "ComfyUI Models" });
+        
+        const actionsEl = headerEl.createDiv({ cls: 'wb-header-actions' });
+        
+        // Add refresh button
+        const refreshBtn = actionsEl.createEl('button', {
+            cls: 'wb-refresh-btn',
+            title: 'Refresh model list'
+        });
+        setIcon(refreshBtn, 'refresh-cw');
+        
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            refreshBtn.addClass('wb-refreshing');
+            try {
+                await this.refresh();
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.removeClass('wb-refreshing');
+            }
+        });
+        
+        // Add refresh metadata button if CivitAI integration is enabled
+        if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
+            const refreshMetadataBtn = actionsEl.createEl('button', {
+                cls: 'wb-refresh-metadata-btn',
+                title: 'Refresh all model metadata from CivitAI'
+            });
+            setIcon(refreshMetadataBtn, 'database');
+            
+            refreshMetadataBtn.addEventListener('click', async () => {
+                refreshMetadataBtn.disabled = true;
+                refreshMetadataBtn.addClass('wb-refreshing');
+                try {
+                    await this.refreshWithMetadata();
+                    new Notice('Model metadata refreshed from CivitAI');
+                } catch (error) {
+                    console.error('Error refreshing metadata:', error);
+                    new Notice('Error refreshing metadata. Check console for details.');
+                } finally {
+                    refreshMetadataBtn.disabled = false;
+                    refreshMetadataBtn.removeClass('wb-refreshing');
+                }
+            });
+        }
 
         if (!this.plugin) {
             container.createEl("p", { text: "Error: Workbench plugin instance not found." });
@@ -305,15 +459,18 @@ Notes about this model...
 
         try {
             // Use the recursive function to find all model files
-            const modelFiles = await findModelsRecursive(modelsPath, modelsPath);
+            const scanResult = await findModelsRecursive(modelsPath, modelsPath);
+            const modelFiles = scanResult.modelFiles;
+            const directoryInfo = scanResult.directoryInfo;
+            
             loadingEl.setText(`Found ${modelFiles.length} model files. Processing...`); // Update loading text
 
             // --- Create Markdown notes for each model file (if setting is enabled) ---
             if (modelNotesFolderPath && modelFiles.length > 0) {
                 new Notice(`Creating/checking notes for ${modelFiles.length} models...`, 3000);
                 const noteCreationPromises = modelFiles.map(relativeModelPath =>
-                    // Pass modelsPath to the function
-                    this.createModelNoteIfNeeded(relativeModelPath, modelsPath)
+                    // Pass modelsPath and directoryInfo to the function
+                    this.createModelNoteIfNeeded(relativeModelPath, modelsPath, directoryInfo)
                 );
                 await Promise.all(noteCreationPromises); // Wait for all checks/creations
                 new Notice(`Finished processing model notes.`, 2000);
@@ -353,8 +510,9 @@ Notes about this model...
     private renderBasicFileItem(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): void {
         const iconEl = fileItemEl.createSpan({ cls: 'wb-model-file-icon' });
 
-        // --- Determine icon based on file extension ---
+        // --- Determine icon based on file extension and inferred type ---
         const extension = path.extname(fileName).toLowerCase();
+        const modelType = this.inferModelType(fullRelativePath);
         let iconName = 'document'; // Default icon
 
         if (['.safetensors', '.ckpt', '.model', '.pth', '.pt', '.gguf'].includes(extension)) {
@@ -386,8 +544,30 @@ Notes about this model...
                 ev.preventDefault();
                 this.app.workspace.openLinkText(linkPath, '', false);
             });
+            
+            // Add model type as subtitle if it's not just the generic "AI Model"
+            if (modelType !== 'AI Model') {
+                const typeEl = fileItemEl.createEl('span', {
+                    cls: 'wb-model-type-hint',
+                    text: ` (${modelType})`
+                });
+                typeEl.style.fontSize = '0.8em';
+                typeEl.style.opacity = '0.7';
+                typeEl.style.fontStyle = 'italic';
+            }
         } else {
             fileItemEl.createSpan({ text: fileName });
+            
+            // Add model type as subtitle if it's not just the generic "AI Model"
+            if (modelType !== 'AI Model') {
+                const typeEl = fileItemEl.createEl('span', {
+                    cls: 'wb-model-type-hint',
+                    text: ` (${modelType})`
+                });
+                typeEl.style.fontSize = '0.8em';
+                typeEl.style.opacity = '0.7';
+                typeEl.style.fontStyle = 'italic';
+            }
         }
     }
 

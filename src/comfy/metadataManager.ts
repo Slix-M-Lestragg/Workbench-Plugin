@@ -4,6 +4,20 @@ import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVer
 import { FileHashCalculator } from '../utils/hashCalculator';
 import * as path from 'path';
 
+/**
+ * Determines if a file is a model file based on its extension.
+ * @param filename The filename to check.
+ * @returns True if the file is considered a model file.
+ */
+function isModelFile(filename: string): boolean {
+    const extension = path.extname(filename).toLowerCase();
+    const modelExtensions = [
+        '.safetensors', '.ckpt', '.pth', '.pt', '.gguf', '.model',
+        '.bin', '.h5', '.onnx', '.tflite', '.pb', '.trt'
+    ];
+    return modelExtensions.includes(extension);
+}
+
 export class ModelMetadataManager {
     private civitaiService: CivitAIService;
     private vault: Vault;
@@ -18,6 +32,12 @@ export class ModelMetadataManager {
 
     async enrichModelMetadata(filePath: string): Promise<EnhancedModelMetadata> {
         const filename = path.basename(filePath);
+        
+        // Only process actual model files
+        if (!isModelFile(filename)) {
+            throw new Error(`File ${filename} is not a model file and should not be processed by metadata manager`);
+        }
+        
         const existingMetadata = this.metadataCache.get(filePath);
 
         // If we have recent metadata, return it
@@ -365,22 +385,52 @@ export class ModelMetadataManager {
         await this.saveMetadataCache();
     }
 
+    async cleanupNonModelMetadata(): Promise<void> {
+        const keysToDelete: string[] = [];
+        
+        for (const [filePath] of this.metadataCache.entries()) {
+            const filename = path.basename(filePath);
+            if (!isModelFile(filename)) {
+                keysToDelete.push(filePath);
+            }
+        }
+        
+        console.log(`Removing ${keysToDelete.length} non-model file entries from metadata cache`);
+        
+        for (const key of keysToDelete) {
+            this.metadataCache.delete(key);
+        }
+        
+        if (keysToDelete.length > 0) {
+            await this.saveMetadataCache();
+            console.log('Cleaned up metadata cache - removed non-model file entries');
+        } else {
+            console.log('No non-model file entries found in metadata cache');
+        }
+    }
+
     async batchEnrichMetadata(filePaths: string[]): Promise<Map<string, EnhancedModelMetadata>> {
         const results = new Map<string, EnhancedModelMetadata>();
         
-        console.log(`Starting batch enrichment for ${filePaths.length} files`);
+        // Filter to only include actual model files
+        const modelFilePaths = filePaths.filter(filePath => {
+            const filename = path.basename(filePath);
+            return isModelFile(filename);
+        });
         
-        for (let i = 0; i < filePaths.length; i++) {
-            const filePath = filePaths[i];
+        console.log(`Starting batch enrichment for ${modelFilePaths.length} model files (filtered from ${filePaths.length} total files)`);
+        
+        for (let i = 0; i < modelFilePaths.length; i++) {
+            const filePath = modelFilePaths[i];
             try {
-                console.log(`Processing ${i + 1}/${filePaths.length}: ${path.basename(filePath)}`);
+                console.log(`Processing ${i + 1}/${modelFilePaths.length}: ${path.basename(filePath)}`);
                 const metadata = await this.enrichModelMetadata(filePath);
                 results.set(filePath, metadata);
                 
                 // Save progress periodically
                 if ((i + 1) % 10 === 0) {
                     await this.saveMetadataCache();
-                    console.log(`Saved progress: ${i + 1}/${filePaths.length} files processed`);
+                    console.log(`Saved progress: ${i + 1}/${modelFilePaths.length} files processed`);
                 }
             } catch (error) {
                 console.error(`Failed to process ${filePath}:`, error);
