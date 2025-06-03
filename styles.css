@@ -409,16 +409,100 @@
     font-weight: 500;
 }
 
-/* Enhanced file item layout */
-.wb-model-file-item {
-    position: relative;
-    padding: 4px 0;
+/* Provider icons */
+.wb-provider-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    margin-right: 4px;
+    opacity: 0.8;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    vertical-align: middle;
 }
 
-.wb-model-file-item:hover {
-    background-color: var(--background-modifier-hover);
+.wb-provider-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+/* Provider-specific styling */
+.wb-provider-icon[title*="Civitai"] {
+    color: #4285f4; /* CivitAI blue */
+}
+
+.wb-provider-icon[title*="Huggingface"] {
+    color: #ff6b35; /* HuggingFace orange */
+}
+
+.wb-provider-icon[title*="Unknown"] {
+    color: var(--text-muted);
+}
+
+/* Refresh button styling for provider integrations */
+.wb-refresh-metadata-btn,
+.wb-refresh-hf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    margin-left: 6px;
+    border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
-    padding: 4px 6px;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+.wb-refresh-metadata-btn:hover,
+.wb-refresh-hf-btn:hover {
+    background-color: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
+}
+
+.wb-refresh-metadata-btn:active,
+.wb-refresh-hf-btn:active {
+    background-color: var(--background-modifier-active);
+}
+
+.wb-refresh-metadata-btn.wb-refreshing,
+.wb-refresh-hf-btn.wb-refreshing {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Ensure icons in refresh buttons are properly sized and centered */
+.wb-refresh-metadata-btn svg,
+.wb-refresh-hf-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+/* CivitAI refresh button specific styling */
+.wb-refresh-metadata-btn {
+    border-color: #4285f4;
+}
+
+.wb-refresh-metadata-btn:hover {
+    background-color: rgba(66, 133, 244, 0.1);
+    border-color: #4285f4;
+}
+
+/* HuggingFace refresh button specific styling */
+.wb-refresh-hf-btn {
+    border-color: #ff6b35;
+}
+
+.wb-refresh-hf-btn:hover {
+    background-color: rgba(255, 107, 53, 0.1);
+    border-color: #ff6b35;
 }
 
 /* Model details modal */

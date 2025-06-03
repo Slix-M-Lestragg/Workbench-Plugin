@@ -1,6 +1,7 @@
 import { TFile, Vault } from 'obsidian';
 import { CivitAIService } from './civitai';
-import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVersion } from './types';
+import { HuggingFaceService } from './huggingface';
+import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVersion, HuggingFaceModel } from './types';
 import { FileHashCalculator } from '../utils/hashCalculator';
 import * as path from 'path';
 
@@ -20,13 +21,15 @@ function isModelFile(filename: string): boolean {
 
 export class ModelMetadataManager {
     private civitaiService: CivitAIService;
+    private huggingfaceService: HuggingFaceService;
     private vault: Vault;
     private metadataCache = new Map<string, EnhancedModelMetadata>();
     private metadataFile = 'model-metadata.json';
 
-    constructor(vault: Vault, apiKey?: string) {
+    constructor(vault: Vault, civitaiApiKey?: string, huggingfaceApiKey?: string) {
         this.vault = vault;
-        this.civitaiService = new CivitAIService(apiKey);
+        this.civitaiService = new CivitAIService(civitaiApiKey);
+        this.huggingfaceService = new HuggingFaceService(huggingfaceApiKey);
         this.loadMetadataCache();
     }
 
@@ -48,6 +51,7 @@ export class ModelMetadataManager {
         const metadata: EnhancedModelMetadata = {
             localPath: filePath,
             filename: filename,
+            provider: 'unknown', // Default to unknown, will be detected later
             relationships: {
                 childModels: [],
                 compatibleModels: [],
@@ -61,31 +65,17 @@ export class ModelMetadataManager {
             // Calculate file hash
             metadata.hash = await FileHashCalculator.calculateSHA256(filePath);
 
-            // Search CivitAI by hash first (most accurate)
-            let civitaiModels: CivitAIModel[] = [];
-            if (metadata.hash) {
-                civitaiModels = await this.civitaiService.searchModelsByHash(metadata.hash);
+            // Detect provider from file path
+            const detectedProvider = this.detectProviderFromPath(filePath);
+            
+            // Try HuggingFace first if detected
+            if (detectedProvider === 'huggingface') {
+                await this.enrichWithHuggingFace(metadata, filename);
             }
-
-            // If no hash match, try name search
-            if (civitaiModels.length === 0) {
-                const cleanName = this.extractModelName(filename);
-                civitaiModels = await this.civitaiService.searchModelsByName(cleanName);
-            }
-
-            if (civitaiModels.length > 0) {
-                const bestMatch = this.findBestMatch(civitaiModels, filename);
-                metadata.civitaiModel = bestMatch;
-
-                // Find the matching version
-                const matchingVersion = this.findMatchingVersion(bestMatch, filename, metadata.hash);
-                if (matchingVersion) {
-                    metadata.civitaiVersion = matchingVersion;
-                    metadata.isVerified = true;
-                }
-
-                // Build relationships
-                metadata.relationships = await this.buildRelationships(bestMatch);
+            
+            // If not HuggingFace or HuggingFace search failed, try CivitAI
+            if (metadata.provider === 'unknown') {
+                await this.enrichWithCivitAI(metadata, filename);
             }
 
             // Cache the metadata
@@ -221,6 +211,60 @@ export class ModelMetadataManager {
         return scores[0].model;
     }
 
+    private findBestHuggingFaceMatch(models: HuggingFaceModel[], filename: string): HuggingFaceModel {
+        if (models.length === 0) {
+            throw new Error('No models provided for matching');
+        }
+        
+        if (models.length === 1) {
+            return models[0];
+        }
+
+        // Score models based on multiple factors
+        const scores = models.map(model => {
+            const baseNameScore = this.calculateNameSimilarity(filename, model.id);
+            
+            // Check similarity with model name and id
+            const modelNameScore = this.calculateNameSimilarity(filename, model.id.split('/').pop() || model.id);
+            const nameScore = Math.max(baseNameScore, modelNameScore);
+            
+            // Popularity score (logarithmic to prevent dominance)
+            const popularityScore = Math.log((model.downloads || 0) + 1) / 25;
+            
+            // Likes score
+            const likesScore = Math.log((model.likes || 0) + 1) / 15;
+            
+            // Boost score for certain model types
+            const typeBoost = (model.pipeline_tag === 'text-to-image' || 
+                             model.pipeline_tag === 'image-to-image' ||
+                             model.library_name === 'diffusers') ? 0.1 : 0;
+            
+            const totalScore = nameScore * 0.6 + popularityScore * 0.2 + likesScore * 0.1 + typeBoost * 0.1;
+            
+            return {
+                model,
+                score: totalScore,
+                nameScore,
+                popularityScore,
+                likesScore
+            };
+        });
+
+        scores.sort((a, b) => b.score - a.score);
+        
+        console.log(`Best HuggingFace match for "${filename}":`, {
+            winner: scores[0].model.id,
+            score: scores[0].score,
+            breakdown: {
+                nameScore: scores[0].nameScore,
+                popularityScore: scores[0].popularityScore,
+                likesScore: scores[0].likesScore
+            }
+        });
+        
+        return scores[0].model;
+    }
+
     private findMatchingVersion(model: CivitAIModel, filename: string, hash?: string): CivitAIModelVersion | null {
         if (!model.modelVersions) return null;
 
@@ -291,12 +335,16 @@ export class ModelMetadataManager {
             if (file instanceof TFile) {
                 const content = await this.vault.read(file);
                 const data = JSON.parse(content);
-                // Convert dates back from string
+                // Convert dates back from string and migrate missing fields
                 Object.entries(data).forEach(([key, value]) => {
                     if (typeof value === 'object' && value && 'lastSynced' in value) {
                         const metadata = value as EnhancedModelMetadata;
                         if (metadata.lastSynced) {
                             metadata.lastSynced = new Date(metadata.lastSynced);
+                        }
+                        // Migration: add provider field if missing
+                        if (!metadata.provider) {
+                            metadata.provider = 'unknown';
                         }
                     }
                 });
@@ -442,5 +490,102 @@ export class ModelMetadataManager {
         console.log(`Batch enrichment completed for ${results.size} files`);
         
         return results;
+    }
+
+    /**
+     * Detects the likely provider of a model based on file path patterns.
+     * @param filePath The full path to the model file
+     * @returns The detected provider type
+     */
+    private detectProviderFromPath(filePath: string): 'civitai' | 'huggingface' | 'unknown' {
+        const pathLower = filePath.toLowerCase();
+        
+        // HuggingFace patterns
+        if (pathLower.includes('huggingface') || 
+            pathLower.includes('hf-hub') ||
+            pathLower.includes('transformers') ||
+            pathLower.match(/.*\/.*--.*\/.*/) || // HF cache pattern: author--model/version
+            pathLower.includes('diffusers')) {
+            return 'huggingface';
+        }
+        
+        // CivitAI patterns (often have hash-based names or specific folders)
+        if (pathLower.includes('civitai') ||
+            pathLower.match(/^[a-f0-9]{8,}\./) || // Hash-based filenames
+            pathLower.includes('lora') && pathLower.match(/\d+\.safetensors$/)) {
+            return 'civitai';
+        }
+        
+        return 'unknown';
+    }
+
+    /**
+     * Enriches metadata using HuggingFace service
+     */
+    private async enrichWithHuggingFace(metadata: EnhancedModelMetadata, filename: string): Promise<void> {
+        try {
+            const cleanName = this.extractModelName(filename);
+            
+            // Try advanced search first
+            let huggingfaceModels = await this.huggingfaceService.searchModelsAdvanced(cleanName);
+            
+            // If no results, try basic search
+            if (huggingfaceModels.length === 0) {
+                huggingfaceModels = await this.huggingfaceService.searchModelsByName(cleanName);
+            }
+            
+            if (huggingfaceModels.length > 0) {
+                const bestMatch = this.findBestHuggingFaceMatch(huggingfaceModels, filename);
+                metadata.huggingfaceModel = bestMatch;
+                metadata.provider = 'huggingface';
+                metadata.isVerified = true;
+                
+                // Set basic relationships
+                metadata.relationships = {
+                    childModels: [],
+                    compatibleModels: [],
+                    baseModel: bestMatch.pipeline_tag || bestMatch.library_name || 'Unknown'
+                };
+            }
+        } catch (error) {
+            console.error('Failed to enrich with HuggingFace:', error);
+        }
+    }
+
+    /**
+     * Enriches metadata using CivitAI service
+     */
+    private async enrichWithCivitAI(metadata: EnhancedModelMetadata, filename: string): Promise<void> {
+        try {
+            // Search CivitAI by hash first (most accurate)
+            let civitaiModels: CivitAIModel[] = [];
+            if (metadata.hash) {
+                civitaiModels = await this.civitaiService.searchModelsByHash(metadata.hash);
+            }
+
+            // If no hash match, try name search
+            if (civitaiModels.length === 0) {
+                const cleanName = this.extractModelName(filename);
+                civitaiModels = await this.civitaiService.searchModelsByName(cleanName);
+            }
+
+            if (civitaiModels.length > 0) {
+                const bestMatch = this.findBestMatch(civitaiModels, filename);
+                metadata.civitaiModel = bestMatch;
+                metadata.provider = 'civitai';
+
+                // Find the matching version
+                const matchingVersion = this.findMatchingVersion(bestMatch, filename, metadata.hash);
+                if (matchingVersion) {
+                    metadata.civitaiVersion = matchingVersion;
+                    metadata.isVerified = true;
+                }
+
+                // Build relationships
+                metadata.relationships = await this.buildRelationships(bestMatch);
+            }
+        } catch (error) {
+            console.error('Failed to enrich with CivitAI:', error);
+        }
     }
 }

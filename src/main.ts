@@ -20,7 +20,16 @@ import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](sr
 import { registerCommands } from './commands'; // from [src/commands.ts](src/commands.ts)
 import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
 import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
-import { JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG } from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
+import { 
+    JSON_CUSTOM_ICON_NAME, 
+    JSON_CUSTOM_ICON_SVG,
+    CIVITAI_ICON_NAME,
+    CIVITAI_ICON_SVG,
+    HUGGINGFACE_ICON_NAME,
+    HUGGINGFACE_ICON_SVG,
+    UNKNOWN_PROVIDER_ICON_NAME,
+    UNKNOWN_PROVIDER_ICON_SVG 
+} from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
 import { ModelListView, MODEL_LIST_VIEW_TYPE } from './ui/ModelListView'; // Added import for new view
 
 // Main Plugin Class: Workbench
@@ -146,9 +155,12 @@ export default class Workbench extends Plugin {
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
-        // Register custom JSON icon
+        // Register custom icons
         addIcon(JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG);
-        console.log("Registered custom JSON icon.");
+        addIcon(CIVITAI_ICON_NAME, CIVITAI_ICON_SVG);
+        addIcon(HUGGINGFACE_ICON_NAME, HUGGINGFACE_ICON_SVG);
+        addIcon(UNKNOWN_PROVIDER_ICON_NAME, UNKNOWN_PROVIDER_ICON_SVG);
+        console.log("Registered custom icons.");
 
         // Initialize status bar and commands
         setupStatusBar(this);

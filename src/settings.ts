@@ -32,6 +32,12 @@ import type Workbench from './main';
         civitaiCacheExpiry: number; // days
         showCivitaiRatings: boolean;
         showCompatibleModels: boolean;
+        
+        // HuggingFace Integration settings
+        huggingfaceApiKey?: string;
+        enableHuggingfaceIntegration: boolean;
+        huggingfaceCacheExpiry: number; // days
+        showProviderIcons: boolean;
 
         // Device-specific settings keyed by operating system
         deviceSettings: Record<OperatingSystem, Partial<DeviceSpecificSettings>>;
@@ -60,6 +66,11 @@ import type Workbench from './main';
         civitaiCacheExpiry: 7,
         showCivitaiRatings: true,
         showCompatibleModels: true,
+        
+        // HuggingFace Integration defaults
+        enableHuggingfaceIntegration: false,
+        huggingfaceCacheExpiry: 7,
+        showProviderIcons: true,
         
         deviceSettings: {
             macos: {},
@@ -254,6 +265,57 @@ export class SampleSettingTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.showCompatibleModels)
                     .onChange(async (value) => {
                         this.plugin.settings.showCompatibleModels = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            // HuggingFace Integration Section
+            generalTabContent.createEl('h3', { text: 'HuggingFace Integration' });
+
+            new Setting(generalTabContent)
+                .setName('Enable HuggingFace Integration')
+                .setDesc('Enable integration with HuggingFace for model metadata and enhanced features')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.enableHuggingfaceIntegration)
+                    .onChange(async (value) => {
+                        this.plugin.settings.enableHuggingfaceIntegration = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('HuggingFace API Token')
+                .setDesc('Optional API token for HuggingFace (enables access to private models and higher rate limits)')
+                .addText(text => text
+                    .setPlaceholder('Enter your HuggingFace API token')
+                    .setValue(this.plugin.settings.huggingfaceApiKey || '')
+                    .onChange(async (value) => {
+                        this.plugin.settings.huggingfaceApiKey = value;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('HuggingFace Cache Expiry (days)')
+                .setDesc('How long to cache HuggingFace metadata before refreshing')
+                .addText(text => text
+                    .setPlaceholder('7')
+                    .setValue(this.plugin.settings.huggingfaceCacheExpiry.toString())
+                    .onChange(async (value) => {
+                        let days = parseInt(value || '7', 10);
+                        if (isNaN(days) || days < 1) days = 7;
+                        this.plugin.settings.huggingfaceCacheExpiry = days;
+                        await this.plugin.saveSettings();
+                    })
+                );
+
+            new Setting(generalTabContent)
+                .setName('Show Provider Icons')
+                .setDesc('Display icons to differentiate between CivitAI, HuggingFace, and unknown model sources')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.showProviderIcons)
+                    .onChange(async (value) => {
+                        this.plugin.settings.showProviderIcons = value;
                         await this.plugin.saveSettings();
                     })
                 );

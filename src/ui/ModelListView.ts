@@ -1,9 +1,11 @@
-import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Menu, Modal } from 'obsidian';
+import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Menu, Modal, TFile } from 'obsidian';
 import * as fs from 'fs'; // Import fs for reading file content
 import * as path from 'path';
 import type Workbench from '../main';
 import { ModelMetadataManager } from '../comfy/metadataManager';
 import { EnhancedModelMetadata } from '../comfy/types';
+import { HuggingFaceService } from '../comfy/huggingface';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME, UNKNOWN_PROVIDER_ICON_NAME, JSON_CUSTOM_ICON_NAME } from './icons';
 
 export const MODEL_LIST_VIEW_TYPE = "comfyui-model-list-view";
 export const MODEL_LIST_ICON = "notebook-tabs"; // Obsidian icon name
@@ -125,6 +127,7 @@ function buildModelTree(filePaths: string[]): ModelTreeNode {
 export class ModelListView extends ItemView {
     plugin: Workbench;
     private metadataManager: ModelMetadataManager | null = null;
+    private huggingfaceService: HuggingFaceService | null = null;
 
     constructor(leaf: WorkspaceLeaf, app: App, plugin: Workbench) {
         super(leaf);
@@ -149,7 +152,7 @@ export class ModelListView extends ItemView {
     }
 
     // --- Recursive function to render the tree ---
-    renderModelTree(node: ModelTreeNode, parentEl: HTMLElement) {
+    async renderModelTree(node: ModelTreeNode, parentEl: HTMLElement): Promise<void> {
         const deviceSettings = this.plugin.getCurrentDeviceSettings();
         const notesFolder = deviceSettings.modelNotesFolderPath?.trim();
 
@@ -165,23 +168,24 @@ export class ModelListView extends ItemView {
             return a.localeCompare(b); // Then sort alphabetically
         });
 
-        keys.forEach(key => {
+        for (const key of keys) {
             if (key === '_files_') {
                 // Render files in the current directory
                 const filePaths = (node[key] as string[]).sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
                 const fileListEl = parentEl.createEl('ul', { cls: 'wb-model-file-list' });
 
-                filePaths.forEach(fullRelativePath => {
+                // Process files with async operations
+                await Promise.all(filePaths.map(async (fullRelativePath) => {
                     const fileName = path.basename(fullRelativePath); // Extract filename for display
                     const fileItemEl = fileListEl.createEl('li', { cls: 'wb-model-file-item' });
                     
                     // Enhance with CivitAI metadata if enabled
                     if (this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
-                        this.enhanceFileItemWithCivitAI(fileItemEl, fullRelativePath, fileName, notesFolder);
+                        await this.enhanceFileItemWithCivitAI(fileItemEl, fullRelativePath, fileName, notesFolder);
                     } else {
-                        this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+                        await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
                     }
-                });
+                }));
                  // Ensure the file list is directly under the parent (which should be details or root)
                  if (parentEl.tagName.toLowerCase() !== 'details') {
                      parentEl.appendChild(fileListEl);
@@ -202,9 +206,9 @@ export class ModelListView extends ItemView {
                 summaryEl.createSpan({ text: key }); // Folder name
 
                 // Recursively render the content of the subfolder
-                this.renderModelTree(subNode, detailsEl);
+                await this.renderModelTree(subNode, detailsEl);
             }
-        });
+        }
     }
 
     /**
@@ -251,7 +255,7 @@ export class ModelListView extends ItemView {
                         console.error(`Error reading source Markdown file ${sourceModelFullPath}:`, readError);
                         new Notice(`Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
                         // Fallback to default frontmatter if reading fails
-                        noteContent = this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
+                        noteContent = await this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
                     }
                     // --- End Markdown Handling ---
 
@@ -266,7 +270,7 @@ export class ModelListView extends ItemView {
 
                 } else {
                     // --- Handle Other File Types (Default Frontmatter) ---
-                    noteContent = this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
+                    noteContent = await this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
                     // --- End Default Handling ---
                 }
 
@@ -285,7 +289,7 @@ export class ModelListView extends ItemView {
      * @param directoryInfo Information about all files in each directory.
      * @returns A string containing the default note content with frontmatter.
      */
-    generateDefaultFrontmatter(relativeModelPath: string, directoryInfo?: Record<string, string[]>): string {
+    async generateDefaultFrontmatter(relativeModelPath: string, directoryInfo?: Record<string, string[]>): Promise<string> {
         const modelFilename = path.basename(relativeModelPath);
         const modelDirectory = path.dirname(relativeModelPath);
         const modelType = this.inferModelType(relativeModelPath);
@@ -294,26 +298,205 @@ export class ModelListView extends ItemView {
         const relatedFiles = directoryInfo?.[modelDirectory] || [];
         const otherFiles = relatedFiles.filter(file => file !== modelFilename && !isModelFile(file));
         
+        // Try to get enhanced metadata
+        let enhancedMetadata: EnhancedModelMetadata | null = null;
+        if (this.metadataManager) {
+            try {
+                const deviceSettings = this.plugin.getCurrentDeviceSettings();
+                const comfyPath = deviceSettings.comfyUiPath?.trim();
+                if (comfyPath) {
+                    const fullModelPath = path.join(comfyPath, 'models', relativeModelPath);
+                    enhancedMetadata = await this.metadataManager.enrichModelMetadata(fullModelPath);
+                }
+            } catch (error) {
+                console.warn(`Failed to get enhanced metadata for ${relativeModelPath}:`, error);
+            }
+        }
+
+        // Start building frontmatter with basic information
         let frontmatter = `---
-# Basic model information (Workbench Generated)
+# Model Information (Workbench Generated)
 model_path: "${relativeModelPath.replace(/\\/g, '/')}"
 model_filename: "${modelFilename}"
-model_type: "${modelType}"
-tags: [workbench-model]
----
+model_type: "${modelType}"`;
 
-# ${modelFilename}
+        // Add enhanced metadata if available
+        if (enhancedMetadata) {
+            // CivitAI model information
+            if (enhancedMetadata.civitaiModel) {
+                const model = enhancedMetadata.civitaiModel;
+                frontmatter += `\ncivitai_model_id: ${model.id}`;
+                frontmatter += `\ncivitai_model_name: "${model.name}"`;
+                if (model.description) {
+                    // Clean description for YAML (escape quotes and newlines)
+                    const cleanDescription = model.description.replace(/"/g, '\\"').replace(/\n/g, ' ').substring(0, 200);
+                    frontmatter += `\ncivitai_description: "${cleanDescription}${model.description.length > 200 ? '...' : ''}"`;
+                }
+                if (model.type) frontmatter += `\ncivitai_type: "${model.type}"`;
+                if (model.nsfw !== undefined) frontmatter += `\ncivitai_nsfw: ${model.nsfw}`;
+                if (model.tags && model.tags.length > 0) {
+                    const tags = model.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
+                    frontmatter += `\ncivitai_tags: [${tags}]`;
+                }
+                if (model.creator?.username) frontmatter += `\ncivitai_creator: "${model.creator.username}"`;
+            }
 
-Notes about this model...
+            // CivitAI version information
+            if (enhancedMetadata.civitaiVersion) {
+                const version = enhancedMetadata.civitaiVersion;
+                frontmatter += `\ncivitai_version_id: ${version.id}`;
+                frontmatter += `\ncivitai_version_name: "${version.name}"`;
+                if (version.baseModel) frontmatter += `\nbase_model: "${version.baseModel}"`;
+                if (version.trainedWords && version.trainedWords.length > 0) {
+                    const trainedWords = version.trainedWords.slice(0, 10).map((word: string) => `"${word}"`).join(', ');
+                    frontmatter += `\ntrained_words: [${trainedWords}]`;
+                }
+            }
+
+            // HuggingFace model information
+            if (enhancedMetadata.huggingfaceModel) {
+                const hfModel = enhancedMetadata.huggingfaceModel;
+                frontmatter += `\nhuggingface_model_id: "${hfModel.id}"`;
+                frontmatter += `\nhuggingface_author: "${hfModel.author}"`;
+                if (hfModel.downloads) frontmatter += `\nhuggingface_downloads: ${hfModel.downloads}`;
+                if (hfModel.likes) frontmatter += `\nhuggingface_likes: ${hfModel.likes}`;
+                if (hfModel.pipeline_tag) frontmatter += `\nhuggingface_pipeline: "${hfModel.pipeline_tag}"`;
+                if (hfModel.tags && hfModel.tags.length > 0) {
+                    const hfTags = hfModel.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
+                    frontmatter += `\nhuggingface_tags: [${hfTags}]`;
+                }
+            }
+
+            // Provider and verification status
+            frontmatter += `\nprovider: "${enhancedMetadata.provider || 'unknown'}"`;
+            if (enhancedMetadata.isVerified !== undefined) frontmatter += `\nverified: ${enhancedMetadata.isVerified}`;
+
+            // File information
+            if (enhancedMetadata.hash) frontmatter += `\nfile_hash: "${enhancedMetadata.hash}"`;
+            if (enhancedMetadata.lastSynced) {
+                frontmatter += `\nlast_synced: "${enhancedMetadata.lastSynced.toISOString()}"`;
+            }
+
+            // Model relationships
+            if (enhancedMetadata.relationships) {
+                const rel = enhancedMetadata.relationships;
+                if (rel.parentModelId) frontmatter += `\nparent_model_id: ${rel.parentModelId}`;
+                if (rel.childModels && rel.childModels.length > 0) {
+                    frontmatter += `\nchild_models_count: ${rel.childModels.length}`;
+                }
+                if (rel.compatibleModels && rel.compatibleModels.length > 0) {
+                    frontmatter += `\ncompatible_models_count: ${rel.compatibleModels.length}`;
+                }
+                if (rel.baseModel) frontmatter += `\nrelationship_base_model: "${rel.baseModel}"`;
+                if (rel.derivedFrom) frontmatter += `\nderived_from: "${rel.derivedFrom}"`;
+            }
+
+            // Enhanced tags including workbench-model and provider
+            const tags = ['workbench-model'];
+            if (enhancedMetadata.provider && enhancedMetadata.provider !== 'unknown') {
+                tags.push(enhancedMetadata.provider);
+            }
+            if (enhancedMetadata.civitaiModel?.type) {
+                tags.push(enhancedMetadata.civitaiModel.type.toLowerCase().replace(/\s+/g, '-'));
+            }
+            if (enhancedMetadata.huggingfaceModel?.pipeline_tag) {
+                tags.push(enhancedMetadata.huggingfaceModel.pipeline_tag.toLowerCase().replace(/\s+/g, '-'));
+            }
+            frontmatter += `\ntags: [${tags.map(tag => `"${tag}"`).join(', ')}]`;
+        } else {
+            // Fallback to basic tags if no enhanced metadata
+            frontmatter += `\ntags: [workbench-model]`;
+        }
+
+        frontmatter += `\n---
+
+# ${enhancedMetadata?.civitaiModel?.name || enhancedMetadata?.huggingfaceModel?.id || modelFilename}
+
 `;
+
+        // Add enhanced description if available
+        if (enhancedMetadata?.civitaiModel?.description) {
+            frontmatter += `## Description\n\n${enhancedMetadata.civitaiModel.description}\n\n`;
+        } else {
+            frontmatter += `Notes about this model...\n\n`;
+        }
+
+        // Add CivitAI model details section
+        if (enhancedMetadata?.civitaiModel) {
+            frontmatter += `## Model Details\n\n`;
+            
+            const model = enhancedMetadata.civitaiModel;
+            if (model.type) frontmatter += `- **Type**: ${model.type}\n`;
+            if (model.creator?.username) frontmatter += `- **Creator**: ${model.creator.username}\n`;
+            if (model.stats) {
+                frontmatter += `- **Downloads**: ${model.stats.downloadCount?.toLocaleString() || 'N/A'}\n`;
+                frontmatter += `- **Rating**: ${model.stats.rating ? model.stats.rating.toFixed(1) : 'N/A'} (${model.stats.ratingCount || 0} reviews)\n`;
+                frontmatter += `- **Favorites**: ${model.stats.favoriteCount?.toLocaleString() || 'N/A'}\n`;
+            }
+
+            if (enhancedMetadata.civitaiVersion) {
+                const version = enhancedMetadata.civitaiVersion;
+                if (version.baseModel) frontmatter += `- **Base Model**: ${version.baseModel}\n`;
+                if (version.trainedWords && version.trainedWords.length > 0) {
+                    frontmatter += `- **Trained Words**: ${version.trainedWords.join(', ')}\n`;
+                }
+            }
+
+            frontmatter += `\n`;
+        }
+
+        // Add HuggingFace model details section
+        if (enhancedMetadata?.huggingfaceModel) {
+            frontmatter += `## HuggingFace Details\n\n`;
+            
+            const hfModel = enhancedMetadata.huggingfaceModel;
+            frontmatter += `- **Model ID**: ${hfModel.id}\n`;
+            frontmatter += `- **Author**: ${hfModel.author}\n`;
+            if (hfModel.downloads) frontmatter += `- **Downloads**: ${hfModel.downloads.toLocaleString()}\n`;
+            if (hfModel.likes) frontmatter += `- **Likes**: ${hfModel.likes.toLocaleString()}\n`;
+            if (hfModel.pipeline_tag) frontmatter += `- **Pipeline**: ${hfModel.pipeline_tag}\n`;
+            if (hfModel.library_name) frontmatter += `- **Library**: ${hfModel.library_name}\n`;
+            if (hfModel.card_data?.license) frontmatter += `- **License**: ${hfModel.card_data.license}\n`;
+            if (hfModel.created_at) frontmatter += `- **Created**: ${new Date(hfModel.created_at).toLocaleDateString()}\n`;
+            if (hfModel.last_modified) frontmatter += `- **Last Modified**: ${new Date(hfModel.last_modified).toLocaleDateString()}\n`;
+
+            frontmatter += `\n`;
+        }
+
+        // Add model relationships section
+        if (enhancedMetadata?.relationships) {
+            const rel = enhancedMetadata.relationships;
+            let hasRelationships = false;
+            let relationshipContent = `## Model Relationships\n\n`;
+
+            if (rel.parentModelId) {
+                relationshipContent += `- **Parent Model ID**: ${rel.parentModelId}\n`;
+                hasRelationships = true;
+            }
+
+            if (rel.childModels && rel.childModels.length > 0) {
+                relationshipContent += `- **Child Models**: ${rel.childModels.length} models\n`;
+                hasRelationships = true;
+            }
+
+            if (rel.compatibleModels && rel.compatibleModels.length > 0) {
+                relationshipContent += `- **Compatible Models**: ${rel.compatibleModels.length} models\n`;
+                hasRelationships = true;
+            }
+
+            if (rel.derivedFrom) {
+                relationshipContent += `- **Derived From**: ${rel.derivedFrom}\n`;
+                hasRelationships = true;
+            }
+
+            if (hasRelationships) {
+                frontmatter += relationshipContent + `\n`;
+            }
+        }
 
         // Add information about related files if any exist
         if (otherFiles.length > 0) {
-            frontmatter += `\n## Related Files
-
-This model is part of a package that includes the following additional files:
-
-`;
+            frontmatter += `## Related Files\n\nThis model is part of a package that includes the following additional files:\n\n`;
             otherFiles.forEach(file => {
                 const fileExt = path.extname(file).toLowerCase();
                 let fileType = 'Unknown';
@@ -331,6 +514,7 @@ This model is part of a package that includes the following additional files:
                 
                 frontmatter += `- **${file}** (${fileType})\n`;
             });
+            frontmatter += `\n`;
         }
 
         return frontmatter;
@@ -378,7 +562,8 @@ This model is part of a package that includes the following additional files:
         if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
             this.metadataManager = new ModelMetadataManager(
                 this.app.vault,
-                this.plugin.settings.civitaiApiKey
+                this.plugin.settings.civitaiApiKey,
+                this.plugin.settings.huggingfaceApiKey
             );
         }
 
@@ -416,7 +601,7 @@ This model is part of a package that includes the following additional files:
                 cls: 'wb-refresh-metadata-btn',
                 title: 'Refresh all model metadata from CivitAI'
             });
-            setIcon(refreshMetadataBtn, 'database');
+            setIcon(refreshMetadataBtn, CIVITAI_ICON_NAME);
             
             refreshMetadataBtn.addEventListener('click', async () => {
                 refreshMetadataBtn.disabled = true;
@@ -430,6 +615,30 @@ This model is part of a package that includes the following additional files:
                 } finally {
                     refreshMetadataBtn.disabled = false;
                     refreshMetadataBtn.removeClass('wb-refreshing');
+                }
+            });
+        }
+
+        // Add HuggingFace refresh button if HuggingFace integration is enabled
+        if (this.plugin && this.plugin.settings.enableHuggingfaceIntegration) {
+            const refreshHFBtn = actionsEl.createEl('button', {
+                cls: 'wb-refresh-hf-btn',
+                title: 'Refresh model metadata from HuggingFace'
+            });
+            setIcon(refreshHFBtn, HUGGINGFACE_ICON_NAME);
+            
+            refreshHFBtn.addEventListener('click', async () => {
+                refreshHFBtn.disabled = true;
+                refreshHFBtn.addClass('wb-refreshing');
+                try {
+                    await this.refreshHuggingFaceMetadata();
+                    new Notice('HuggingFace model metadata refreshed');
+                } catch (error) {
+                    console.error('Error refreshing HuggingFace metadata:', error);
+                    new Notice('Error refreshing HuggingFace metadata. Check console for details.');
+                } finally {
+                    refreshHFBtn.disabled = false;
+                    refreshHFBtn.removeClass('wb-refreshing');
                 }
             });
         }
@@ -488,7 +697,7 @@ This model is part of a package that includes the following additional files:
 
                 // --- Render the nested tree ---
                 const treeRootEl = container.createDiv({ cls: 'wb-model-tree-root' });
-                this.renderModelTree(modelTree, treeRootEl); // Start rendering the tree
+                await this.renderModelTree(modelTree, treeRootEl); // Start rendering the tree
             }
         } catch (error: unknown) {
             loadingEl.remove(); // Remove loading message
@@ -507,7 +716,109 @@ This model is part of a package that includes the following additional files:
         this.contentEl.empty();
     }
 
-    private renderBasicFileItem(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): void {
+    /**
+     * Determines the provider of a model based on its metadata or path characteristics.
+     * @param fullRelativePath Path of the model file relative to the ComfyUI 'models' directory.
+     * @returns The detected provider type.
+     */
+    /**
+     * Gets the provider for a model by reading it from the corresponding note's frontmatter.
+     * Falls back to path-based detection if the note doesn't exist or doesn't have provider info.
+     * @param fullRelativePath The relative path to the model file
+     * @param notesFolder The base folder where notes are stored
+     * @returns The provider type: 'civitai', 'huggingface', or 'unknown'
+     */
+    private async getModelProviderFromNote(fullRelativePath: string, notesFolder?: string): Promise<'civitai' | 'huggingface' | 'unknown'> {
+        if (!notesFolder) {
+            return this.detectModelProviderFromPath(fullRelativePath);
+        }
+
+        try {
+            // Construct the note path
+            const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
+            const noteSubfolderPath = path.dirname(fullRelativePath);
+            const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
+
+            // Check if the note exists and is a file
+            const noteFile = this.app.vault.getAbstractFileByPath(fullNotePath);
+            if (!noteFile || !('stat' in noteFile)) {
+                return this.detectModelProviderFromPath(fullRelativePath);
+            }
+
+            // Read the note content
+            const noteContent = await this.app.vault.read(noteFile as TFile);
+            
+            // Parse frontmatter to get provider
+            const frontmatterMatch = noteContent.match(/^---\n([\s\S]*?)\n---/);
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1];
+                
+                // First check for explicit provider field
+                const providerMatch = frontmatter.match(/provider:\s*['""]?([^'"\n]+)['""]?/);
+                if (providerMatch) {
+                    const provider = providerMatch[1].trim().toLowerCase();
+                    if (provider === 'civitai' || provider === 'huggingface') {
+                        return provider as 'civitai' | 'huggingface';
+                    }
+                }
+                
+                // Fallback: check source field for provider detection
+                const sourceMatch = frontmatter.match(/source:\s*['""]?([^'"\n]+)['""]?/);
+                if (sourceMatch) {
+                    const source = sourceMatch[1].trim().toLowerCase();
+                    if (source.includes('huggingface.co')) {
+                        return 'huggingface';
+                    }
+                    if (source.includes('civitai.com')) {
+                        return 'civitai';
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read provider from note:', error);
+        }
+
+        // Fallback to path-based detection
+        return this.detectModelProviderFromPath(fullRelativePath);
+    }
+
+    /**
+     * Legacy method: Detects model provider based on file path patterns.
+     * This is used as a fallback when note-based provider detection fails.
+     * @param fullRelativePath The relative path to the model file
+     * @returns The provider type: 'civitai', 'huggingface', or 'unknown'
+     */
+    private detectModelProviderFromPath(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
+        // Check for common HuggingFace model patterns
+        const pathLower = fullRelativePath.toLowerCase();
+        
+        // HuggingFace patterns
+        if (pathLower.includes('huggingface') || 
+            pathLower.includes('hf-hub') ||
+            pathLower.includes('transformers') ||
+            pathLower.match(/.*\/.*--.*\/.*/) || // HF cache pattern: author--model/version
+            pathLower.includes('diffusers')) {
+            return 'huggingface';
+        }
+        
+        // CivitAI patterns (often have hash-based names or specific folders)
+        if (pathLower.includes('civitai') ||
+            pathLower.match(/^[a-f0-9]{8,}\./) || // Hash-based filenames
+            pathLower.includes('lora') && pathLower.match(/\d+\.safetensors$/)) {
+            return 'civitai';
+        }
+        
+        return 'unknown';
+    }
+
+    /**
+     * @deprecated Use getModelProviderFromNote instead for frontmatter-based provider detection
+     */
+    private detectModelProvider(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
+        return this.detectModelProviderFromPath(fullRelativePath);
+    }
+
+    private async renderBasicFileItem(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): Promise<void> {
         const iconEl = fileItemEl.createSpan({ cls: 'wb-model-file-icon' });
 
         // --- Determine icon based on file extension and inferred type ---
@@ -518,13 +829,34 @@ This model is part of a package that includes the following additional files:
         if (['.safetensors', '.ckpt', '.model', '.pth', '.pt', '.gguf'].includes(extension)) {
             iconName = 'file-sliders'; // AI Model icon
         } else if (extension === '.json') {
-            iconName = 'file-json';
+            iconName = JSON_CUSTOM_ICON_NAME;
         } else if (extension === '.md') {
             iconName = 'file-text';
         } else if (['.yaml', '.yml'].includes(extension)) {
             iconName = 'file-code';
         }
         setIcon(iconEl, iconName);
+
+        // --- Add provider icon if enabled and for model files ---
+        if (this.plugin.settings.showProviderIcons && isModelFile(fileName)) {
+            const provider = await this.getModelProviderFromNote(fullRelativePath, notesFolder);
+            const providerIconEl = fileItemEl.createSpan({ cls: 'wb-provider-icon' });
+            
+            let providerIconName = UNKNOWN_PROVIDER_ICON_NAME;
+            switch (provider) {
+                case 'civitai':
+                    providerIconName = CIVITAI_ICON_NAME;
+                    break;
+                case 'huggingface':
+                    providerIconName = HUGGINGFACE_ICON_NAME;
+                    break;
+                default:
+                    providerIconName = UNKNOWN_PROVIDER_ICON_NAME;
+                    break;
+            }
+            setIcon(providerIconEl, providerIconName);
+            providerIconEl.title = `Provider: ${provider.charAt(0).toUpperCase() + provider.slice(1)}`;
+        }
 
         // --- Create internal link to the note ---
         if (notesFolder) {
@@ -572,17 +904,17 @@ This model is part of a package that includes the following additional files:
     }
 
     private async enhanceFileItemWithCivitAI(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): Promise<void> {
-        if (!this.metadataManager) return this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+        if (!this.metadataManager) return await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
 
         try {
             const deviceSettings = this.plugin.getCurrentDeviceSettings();
             const comfyPath = deviceSettings.comfyUiPath?.trim();
-            if (!comfyPath) return this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+            if (!comfyPath) return await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
 
             const fullModelPath = path.join(comfyPath, 'models', fullRelativePath);
             
             // Start with basic rendering
-            this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+            await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
 
             // Enhance with CivitAI data asynchronously
             const metadata = await this.metadataManager.enrichModelMetadata(fullModelPath);
@@ -810,15 +1142,97 @@ This model is part of a package that includes the following additional files:
         this.onOpen();
     }
 
+    public async refreshHuggingFaceMetadata(): Promise<void> {
+        if (!this.plugin.settings.enableHuggingfaceIntegration) {
+            new Notice('HuggingFace integration is not enabled');
+            return;
+        }
+
+        if (!this.huggingfaceService) {
+            this.huggingfaceService = new HuggingFaceService(
+                this.plugin.settings.huggingfaceApiKey || ''
+            );
+        }
+
+        const deviceSettings = this.plugin.getCurrentDeviceSettings();
+        const comfyPath = deviceSettings.comfyUiPath?.trim();
+        
+        if (!comfyPath) {
+            new Notice('ComfyUI path not configured');
+            return;
+        }
+
+        const modelsPath = path.join(comfyPath, 'models');
+        if (!fs.existsSync(modelsPath)) {
+            new Notice('Models directory not found');
+            return;
+        }
+
+        try {
+            new Notice('Refreshing HuggingFace model metadata...');
+            
+            // Find all model files
+            const result = await findModelsRecursive(modelsPath, modelsPath);
+            const modelFiles = result.modelFiles;
+            
+            let refreshedCount = 0;
+            for (const modelFile of modelFiles) {
+                const provider = this.detectModelProvider(modelFile);
+                if (provider === 'huggingface') {
+                    try {
+                        // For HuggingFace models, we could try to extract model info from path
+                        // or attempt to find associated metadata files
+                        
+                        // Try to extract model ID from HuggingFace cache paths
+                        const hfModelMatch = modelFile.match(/.*\/(.+)--(.+)\/.*/);
+                        if (hfModelMatch) {
+                            const author = hfModelMatch[1];
+                            const modelName = hfModelMatch[2];
+                            const modelId = `${author}/${modelName}`;
+                            
+                            // Fetch model info from HuggingFace
+                            const modelInfo = await this.huggingfaceService.getModelInfo(modelId);
+                            if (modelInfo) {
+                                refreshedCount++;
+                                // Could store this metadata for later use
+                                console.log(`Refreshed metadata for ${modelId}:`, modelInfo);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to refresh metadata for ${modelFile}:`, error);
+                    }
+                }
+            }
+            
+            new Notice(`Refreshed metadata for ${refreshedCount} HuggingFace models`);
+        } catch (error) {
+            console.error('Error refreshing HuggingFace metadata:', error);
+            new Notice('Failed to refresh HuggingFace metadata');
+        }
+        
+        // Refresh the view
+        this.onOpen();
+    }
+
     public updateCivitAISettings(): void {
         // Reinitialize metadata manager when settings change
         if (this.plugin.settings.enableCivitaiIntegration) {
             this.metadataManager = new ModelMetadataManager(
                 this.app.vault,
-                this.plugin.settings.civitaiApiKey
+                this.plugin.settings.civitaiApiKey,
+                this.plugin.settings.huggingfaceApiKey
             );
         } else {
             this.metadataManager = null;
+        }
+
+        // Initialize HuggingFace service when settings change
+        if (this.plugin.settings.enableHuggingfaceIntegration) {
+            this.huggingfaceService = new HuggingFaceService(
+                this.plugin.settings.huggingfaceApiKey || ''
+            );
+        } else {
+            this.huggingfaceService = null;
         }
     }
 }

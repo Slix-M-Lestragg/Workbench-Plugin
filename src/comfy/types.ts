@@ -125,12 +125,50 @@ export interface ModelRelationship {
     derivedFrom?: string;
 }
 
+// --- HuggingFace API Types ---
+
+export interface HuggingFaceModel {
+    id: string;
+    modelId: string;
+    author: string;
+    sha: string;
+    downloads: number;
+    likes: number;
+    tags: string[];
+    pipeline_tag?: string;
+    library_name?: string;
+    created_at: string;
+    last_modified: string;
+    card_data?: {
+        language?: string[];
+        license?: string;
+        base_model?: string;
+        pipeline_tag?: string;
+        tags?: string[];
+    };
+}
+
+export interface HuggingFaceFile {
+    path: string;
+    size: number;
+    blob_id: string;
+    lfs?: {
+        oid: string;
+        size: number;
+        pointer_size: number;
+    };
+}
+
+export type ModelProvider = 'civitai' | 'huggingface' | 'unknown';
+
 export interface EnhancedModelMetadata {
     localPath: string;
     filename: string;
     hash?: string;
+    provider: ModelProvider;
     civitaiModel?: CivitAIModel;
     civitaiVersion?: CivitAIModelVersion;
+    huggingfaceModel?: HuggingFaceModel;
     relationships: ModelRelationship;
     lastSynced?: Date;
     isVerified: boolean;
