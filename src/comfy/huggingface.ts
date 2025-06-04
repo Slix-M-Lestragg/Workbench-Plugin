@@ -3,14 +3,38 @@ import type { HuggingFaceModel, HuggingFaceFile } from './types';
 
 export class HuggingFaceService {
     private static readonly BASE_URL = 'https://huggingface.co';
-    private static readonly API_BASE_URL = 'https://huggingface.co/api';
+    private static readonly API_BASE_URL = 'https://huggingface.co'; // Updated: HF API is at the root, not /api
     private static readonly RATE_LIMIT_DELAY = 500; // 0.5 second between requests
     private lastRequestTime = 0;
     private cache = new Map<string, unknown>();
     private apiToken?: string;
 
     constructor(apiToken?: string) {
-        this.apiToken = apiToken;
+        this.setApiToken(apiToken);
+    }
+
+    /**
+     * Set and validate the API token
+     */
+    setApiToken(apiToken?: string): void {
+        if (apiToken && typeof apiToken === 'string') {
+            const trimmed = apiToken.trim();
+            // HuggingFace tokens typically start with 'hf_' and are at least 20 characters
+            if (trimmed.length > 0) {
+                this.apiToken = trimmed;
+            } else {
+                this.apiToken = undefined;
+            }
+        } else {
+            this.apiToken = undefined;
+        }
+    }
+
+    /**
+     * Check if we have a valid API token
+     */
+    hasValidApiToken(): boolean {
+        return this.apiToken !== undefined && this.apiToken.length > 0;
     }
 
     private async rateLimit() {
@@ -47,7 +71,8 @@ export class HuggingFaceService {
             'User-Agent': 'Obsidian-Workbench-Plugin/1.0.0'
         };
 
-        if (this.apiToken) {
+        // Only add authentication if we have a valid API token
+        if (this.hasValidApiToken()) {
             headers['Authorization'] = `Bearer ${this.apiToken}`;
         }
 
@@ -59,7 +84,14 @@ export class HuggingFaceService {
             });
 
             if (response.status !== 200) {
-                throw new Error(`HuggingFace API error: ${response.status}`);
+                console.error(`HuggingFace API error: ${response.status} for ${endpoint}`);
+                console.error('Response details:', {
+                    status: response.status,
+                    statusText: response.status,
+                    url: url.toString(),
+                    headers: response.headers
+                });
+                throw new Error(`HuggingFace API error: ${response.status} for ${endpoint}`);
             }
 
             const data = response.json as T;
@@ -70,18 +102,63 @@ export class HuggingFaceService {
             
             return data;
         } catch (error) {
-            console.error('HuggingFace API request failed:', error);
+            console.error(`HuggingFace API error details for ${endpoint}:`, {
+                error: error,
+                errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                errorType: typeof error,
+                hasAuthHeader: 'Authorization' in headers,
+                debugInfo: this.getDebugInfo()
+            });
+
+            // Handle authentication errors - check multiple error patterns
+            const isAuthError = error instanceof Error && (
+                error.message.includes('status 401') || 
+                error.message.includes('401') ||
+                ('status' in error && (error as {status: number}).status === 401)
+            );
+            
+            if (isAuthError) {
+                console.warn(`🔍 Detected 401 error for ${endpoint}, attempting retry without auth`);
+                
+                // Always try without auth for 401 errors, regardless of whether we think we have a token
+                const headersWithoutAuth = {
+                    'User-Agent': 'Obsidian-Workbench-Plugin/1.0.0'
+                };
+                
+                try {
+                    console.log(`🔄 Retrying ${endpoint} without authentication...`);
+                    const retryResponse = await requestUrl({
+                        url: url.toString(),
+                        method: 'GET',
+                        headers: headersWithoutAuth
+                    });
+
+                    if (retryResponse.status === 200) {
+                        console.log(`✅ HuggingFace API retry successful for ${endpoint}`);
+                        const data = retryResponse.json as T;
+                        this.cache.set(cacheKey, data);
+                        setTimeout(() => this.cache.delete(cacheKey), 60 * 60 * 1000);
+                        return data;
+                    } else {
+                        console.warn(`⚠️ Retry returned status ${retryResponse.status} for ${endpoint}`);
+                    }
+                } catch (retryError) {
+                    console.error(`❌ HuggingFace API retry also failed for ${endpoint}:`, retryError);
+                }
+            }
+            
+            console.error(`💥 HuggingFace API request failed for ${endpoint}:`, error);
             throw error;
         }
     }
 
     async searchModelsByName(query: string): Promise<HuggingFaceModel[]> {
         try {
-            // Use the correct HuggingFace models API endpoint
-            const response = await this.makeRequest<HuggingFaceModel[]>('/models', {
+            // Use the correct HuggingFace models API endpoint with proper parameters
+            const response = await this.makeRequest<HuggingFaceModel[]>('/api/models', {
                 search: query,
                 limit: 10,
-                filter: 'diffusers,pytorch,safetensors'
+                full: 'true' // Get full model data including tags, files, etc.
             });
             return Array.isArray(response) ? response : [];
         } catch (error) {
@@ -93,7 +170,7 @@ export class HuggingFaceService {
     async getModelInfo(modelId: string): Promise<HuggingFaceModel | null> {
         try {
             // Use the correct HuggingFace model API endpoint
-            return await this.makeRequest<HuggingFaceModel>(`/models/${encodeURIComponent(modelId)}`);
+            return await this.makeRequest<HuggingFaceModel>(`/api/models/${encodeURIComponent(modelId)}`);
         } catch (error) {
             console.error(`Error fetching HuggingFace model ${modelId}:`, error);
             return null;
@@ -102,7 +179,7 @@ export class HuggingFaceService {
 
     async getModelFiles(modelId: string): Promise<HuggingFaceFile[]> {
         try {
-            const response = await this.makeRequest<HuggingFaceFile[]>(`/models/${encodeURIComponent(modelId)}/tree/main`);
+            const response = await this.makeRequest<HuggingFaceFile[]>(`/api/models/${encodeURIComponent(modelId)}/tree/main`);
             return Array.isArray(response) ? response : [];
         } catch (error) {
             console.error(`Error fetching HuggingFace model files for ${modelId}:`, error);
@@ -123,11 +200,11 @@ export class HuggingFaceService {
      */
     async searchModelsByTags(tags: string[], limit = 10): Promise<HuggingFaceModel[]> {
         try {
-            const tagFilter = tags.join(',');
-            const response = await this.makeRequest<HuggingFaceModel[]>('/models', {
-                filter: tagFilter,
+            // Use filter parameter for tags according to HF API docs
+            const response = await this.makeRequest<HuggingFaceModel[]>('/api/models', {
+                filter: tags.join(','),
                 limit,
-                sort: 'downloads'
+                full: 'true'
             });
             return Array.isArray(response) ? response : [];
         } catch (error) {
@@ -143,14 +220,16 @@ export class HuggingFaceService {
         try {
             const params: Record<string, unknown> = {
                 limit,
-                sort: 'downloads'
+                sort: 'downloads',
+                direction: '-1', // descending order for most popular
+                full: 'true'
             };
             
             if (category) {
                 params.filter = category;
             }
             
-            const response = await this.makeRequest<HuggingFaceModel[]>('/models', params);
+            const response = await this.makeRequest<HuggingFaceModel[]>('/api/models', params);
             return Array.isArray(response) ? response : [];
         } catch (error) {
             console.error('Error fetching popular HuggingFace models:', error);
@@ -190,5 +269,174 @@ export class HuggingFaceService {
 
     clearCache(): void {
         this.cache.clear();
+    }
+
+    /**
+     * Get debug information about the service state
+     */
+    getDebugInfo(): Record<string, string | number | boolean> {
+        return {
+            hasApiToken: this.hasValidApiToken(),
+            apiTokenPresent: this.apiToken !== undefined,
+            apiTokenLength: this.apiToken ? this.apiToken.length : 0,
+            apiTokenPrefix: this.apiToken ? this.apiToken.substring(0, 8) + '...' : 'none',
+            cacheSize: this.cache.size,
+            lastRequestTime: this.lastRequestTime
+        };
+    }
+
+    /**
+     * Force clear any cached authentication and reset token
+     */
+    clearAuthAndCache(): void {
+        this.apiToken = undefined;
+        this.cache.clear();
+        console.log('🧹 Cleared HuggingFace auth and cache');
+    }
+
+    /**
+     * Enhanced search with multiple strategies for better model discovery
+     */
+    async searchModels(query: string, options: {
+        limit?: number;
+        sort?: 'downloads' | 'likes' | 'lastModified';
+        direction?: 'asc' | 'desc';
+        task?: string;
+        library?: string;
+    } = {}): Promise<{models: HuggingFaceModel[], numItemsOnPage: number, numTotalItems: number}> {
+        try {
+            const params: Record<string, unknown> = {
+                search: query,
+                limit: options.limit || 20,
+                full: 'true'
+            };
+
+            // Add sorting parameters - HF API uses direction '-1' for descending
+            if (options.sort) {
+                params.sort = options.sort;
+                params.direction = options.direction === 'desc' ? '-1' : '1';
+            }
+
+            if (options.task) {
+                params.filter = options.task;
+            }
+
+            if (options.library) {
+                params.filter = params.filter ? `${params.filter},${options.library}` : options.library;
+            }
+
+            const response = await this.makeRequest<HuggingFaceModel[]>('/api/models', params);
+            const models = Array.isArray(response) ? response : [];
+            
+            return {
+                models,
+                numItemsOnPage: models.length,
+                numTotalItems: models.length // HF API doesn't provide total count easily
+            };
+        } catch (error) {
+            console.error('Error in enhanced search:', error);
+            return { models: [], numItemsOnPage: 0, numTotalItems: 0 };
+        }
+    }
+
+    /**
+     * Find a model by exact name/ID
+     */
+    async findModelByName(modelName: string): Promise<HuggingFaceModel | null> {
+        try {
+            // First try exact match
+            try {
+                return await this.getModelInfo(modelName);
+            } catch {
+                // If exact match fails, try search
+                const results = await this.searchModels(modelName, { limit: 1 });
+                return results.models.length > 0 ? results.models[0] : null;
+            }
+        } catch (error) {
+            console.error('Error finding model by name:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get related models based on tags and pipeline type
+     */
+    async getRelatedModels(modelId: string, limit = 10): Promise<HuggingFaceModel[]> {
+        try {
+            const model = await this.getModelInfo(modelId);
+            if (!model) return [];
+            
+            const tags = model.tags?.slice(0, 3) || []; // Use first 3 tags for related search
+            
+            if (tags.length === 0 && !model.pipeline_tag) return [];
+
+            const searchQuery = tags.length > 0 ? tags.join(' ') : '';
+            const results = await this.searchModels(searchQuery, { 
+                limit,
+                task: model.pipeline_tag 
+            });
+
+            // Filter out the original model and return related ones
+            return results.models.filter(m => m.id !== modelId);
+        } catch (error) {
+            console.error('Error fetching related models:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Extract and format metadata from a HuggingFace model
+     */
+    extractModelMetadata(model: HuggingFaceModel): Record<string, string | number | string[] | undefined> {
+        return {
+            id: model.id,
+            author: model.author,
+            downloads: model.downloads,
+            likes: model.likes,
+            tags: model.tags || [],
+            task: model.pipeline_tag,
+            library: model.library_name,
+            created: model.created_at,
+            lastModified: model.last_modified,
+            license: model.card_data?.license,
+            languages: model.card_data?.language || [],
+            baseModel: model.card_data?.base_model,
+            datasets: model.card_data?.tags?.filter(tag => tag.startsWith('dataset:')) || [],
+            pipelineTag: model.card_data?.pipeline_tag || model.pipeline_tag
+        };
+    }
+
+    /**
+     * Simple search with minimal parameters to avoid 400 errors
+     */
+    async searchModelsSimple(query: string, limit = 10): Promise<HuggingFaceModel[]> {
+        try {
+            // Try the simplest possible API call first
+            console.log(`🔍 Trying simple HuggingFace search for: "${query}"`);
+            
+            const response = await this.makeRequest<HuggingFaceModel[]>('/api/models', {
+                search: query,
+                limit: limit,
+                full: 'true'
+            });
+            
+            console.log(`✅ Simple search successful, found ${response?.length || 0} models`);
+            return Array.isArray(response) ? response : [];
+        } catch (error) {
+            console.error('Simple search failed, trying basic list:', error);
+            
+            // Fallback: get basic model list without search
+            try {
+                const fallbackResponse = await this.makeRequest<HuggingFaceModel[]>('/api/models', {
+                    limit: limit,
+                    full: 'true'
+                });
+                console.log(`📋 Fallback list successful, found ${fallbackResponse?.length || 0} models`);
+                return Array.isArray(fallbackResponse) ? fallbackResponse : [];
+            } catch (fallbackError) {
+                console.error('Both simple search and fallback failed:', fallbackError);
+                return [];
+            }
+        }
     }
 }

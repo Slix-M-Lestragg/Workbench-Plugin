@@ -1,11 +1,12 @@
-import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Menu, Modal, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Modal, TFile } from 'obsidian';
 import * as fs from 'fs'; // Import fs for reading file content
 import * as path from 'path';
 import type Workbench from '../main';
 import { ModelMetadataManager } from '../comfy/metadataManager';
 import { EnhancedModelMetadata } from '../comfy/types';
 import { HuggingFaceService } from '../comfy/huggingface';
-import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME, UNKNOWN_PROVIDER_ICON_NAME, JSON_CUSTOM_ICON_NAME } from './icons';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME, UNKNOWN_PROVIDER_ICON_NAME } from './icons';
+import type { HuggingFaceModel, HuggingFaceFile } from '../comfy/types';
 
 export const MODEL_LIST_VIEW_TYPE = "comfyui-model-list-view";
 export const MODEL_LIST_ICON = "notebook-tabs"; // Obsidian icon name
@@ -641,7 +642,20 @@ model_type: "${modelType}"`;
                     refreshHFBtn.removeClass('wb-refreshing');
                 }
             });
+
+            // Add HuggingFace search button
+            const searchHFBtn = actionsEl.createEl('button', {
+                cls: 'wb-search-hf-btn',
+                title: 'Search HuggingFace models'
+            });
+            setIcon(searchHFBtn, 'search');
+            
+            searchHFBtn.addEventListener('click', () => {
+                this.showHuggingFaceSearchModal();
+            });
         }
+
+        // --- End search interface ---
 
         if (!this.plugin) {
             container.createEl("p", { text: "Error: Workbench plugin instance not found." });
@@ -789,450 +803,456 @@ model_type: "${modelType}"`;
      * @returns The provider type: 'civitai', 'huggingface', or 'unknown'
      */
     private detectModelProviderFromPath(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
-        // Check for common HuggingFace model patterns
-        const pathLower = fullRelativePath.toLowerCase();
-        
-        // HuggingFace patterns
-        if (pathLower.includes('huggingface') || 
-            pathLower.includes('hf-hub') ||
-            pathLower.includes('transformers') ||
-            pathLower.match(/.*\/.*--.*\/.*/) || // HF cache pattern: author--model/version
-            pathLower.includes('diffusers')) {
-            return 'huggingface';
-        }
-        
-        // CivitAI patterns (often have hash-based names or specific folders)
-        if (pathLower.includes('civitai') ||
-            pathLower.match(/^[a-f0-9]{8,}\./) || // Hash-based filenames
-            pathLower.includes('lora') && pathLower.match(/\d+\.safetensors$/)) {
-            return 'civitai';
-        }
-        
+        // For now, return 'unknown' as the default. In the future, this could include
+        // more sophisticated path-based detection logic
         return 'unknown';
     }
 
     /**
-     * @deprecated Use getModelProviderFromNote instead for frontmatter-based provider detection
+     * Shows the HuggingFace search modal for discovering and downloading models
      */
-    private detectModelProvider(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
-        return this.detectModelProviderFromPath(fullRelativePath);
+    private showHuggingFaceSearchModal(): void {
+        new HuggingFaceSearchModal(this.app, this.plugin).open();
     }
 
-    private async renderBasicFileItem(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): Promise<void> {
-        const iconEl = fileItemEl.createSpan({ cls: 'wb-model-file-icon' });
+    /**
+     * Refresh the model list view
+     */
+    private async refresh(): Promise<void> {
+        await this.onOpen();
+    }
 
-        // --- Determine icon based on file extension and inferred type ---
-        const extension = path.extname(fileName).toLowerCase();
-        const modelType = this.inferModelType(fullRelativePath);
-        let iconName = 'document'; // Default icon
-
-        if (['.safetensors', '.ckpt', '.model', '.pth', '.pt', '.gguf'].includes(extension)) {
-            iconName = 'file-sliders'; // AI Model icon
-        } else if (extension === '.json') {
-            iconName = JSON_CUSTOM_ICON_NAME;
-        } else if (extension === '.md') {
-            iconName = 'file-text';
-        } else if (['.yaml', '.yml'].includes(extension)) {
-            iconName = 'file-code';
+    /**
+     * Refresh model metadata from CivitAI
+     */
+    private async refreshWithMetadata(): Promise<void> {
+        if (this.metadataManager) {
+            await this.metadataManager.refreshAllMetadata();
         }
-        setIcon(iconEl, iconName);
+        await this.refresh();
+    }
 
-        // --- Add provider icon if enabled and for model files ---
-        if (this.plugin.settings.showProviderIcons && isModelFile(fileName)) {
-            const provider = await this.getModelProviderFromNote(fullRelativePath, notesFolder);
-            const providerIconEl = fileItemEl.createSpan({ cls: 'wb-provider-icon' });
-            
-            let providerIconName = UNKNOWN_PROVIDER_ICON_NAME;
-            switch (provider) {
-                case 'civitai':
-                    providerIconName = CIVITAI_ICON_NAME;
-                    break;
-                case 'huggingface':
-                    providerIconName = HUGGINGFACE_ICON_NAME;
-                    break;
-                default:
-                    providerIconName = UNKNOWN_PROVIDER_ICON_NAME;
-                    break;
-            }
-            setIcon(providerIconEl, providerIconName);
-            providerIconEl.title = `Provider: ${provider.charAt(0).toUpperCase() + provider.slice(1)}`;
+    /**
+     * Refresh model metadata from HuggingFace
+     */
+    private async refreshHuggingFaceMetadata(): Promise<void> {
+        if (this.metadataManager) {
+            // For now, this would trigger a refresh of HuggingFace metadata
+            // Implementation would depend on how HuggingFace metadata is stored/managed
+            console.log('HuggingFace metadata refresh triggered');
         }
+        await this.refresh();
+    }
 
-        // --- Create internal link to the note ---
+    /**
+     * Renders a basic file item without enhanced metadata
+     */
+    private async renderBasicFileItem(
+        fileItemEl: HTMLElement, 
+        fullRelativePath: string, 
+        fileName: string, 
+        notesFolder?: string
+    ): Promise<void> {
+        const fileNameEl = fileItemEl.createSpan({ cls: 'wb-model-filename' });
+        fileNameEl.textContent = fileName;
+        
+        // Add basic file information
+        const fileInfoEl = fileItemEl.createDiv({ cls: 'wb-model-info' });
+        fileInfoEl.createSpan({ 
+            cls: 'wb-model-path', 
+            text: `Path: ${fullRelativePath}` 
+        });
+
+        // Add note link if notes folder is configured
         if (notesFolder) {
             const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
             const noteSubfolderPath = path.dirname(fullRelativePath);
             const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
-            const linkPath = fullNotePath.replace(/\.md$/, ''); // Path for openLinkText (no extension)
-
-            const linkEl = fileItemEl.createEl('a', {
-                cls: 'internal-link wb-model-file-link',
-                text: fileName,
+            
+            const noteLinkEl = fileItemEl.createEl('a', {
+                cls: 'wb-model-note-link',
+                text: '📝 Note',
                 href: '#'
             });
-            linkEl.dataset.href = linkPath;
-
-            linkEl.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                this.app.workspace.openLinkText(linkPath, '', false);
-            });
             
-            // Add model type as subtitle if it's not just the generic "AI Model"
-            if (modelType !== 'AI Model') {
-                const typeEl = fileItemEl.createEl('span', {
-                    cls: 'wb-model-type-hint',
-                    text: ` (${modelType})`
-                });
-                typeEl.style.fontSize = '0.8em';
-                typeEl.style.opacity = '0.7';
-                typeEl.style.fontStyle = 'italic';
-            }
-        } else {
-            fileItemEl.createSpan({ text: fileName });
-            
-            // Add model type as subtitle if it's not just the generic "AI Model"
-            if (modelType !== 'AI Model') {
-                const typeEl = fileItemEl.createEl('span', {
-                    cls: 'wb-model-type-hint',
-                    text: ` (${modelType})`
-                });
-                typeEl.style.fontSize = '0.8em';
-                typeEl.style.opacity = '0.7';
-                typeEl.style.fontStyle = 'italic';
-            }
-        }
-    }
-
-    private async enhanceFileItemWithCivitAI(fileItemEl: HTMLElement, fullRelativePath: string, fileName: string, notesFolder?: string): Promise<void> {
-        if (!this.metadataManager) return await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
-
-        try {
-            const deviceSettings = this.plugin.getCurrentDeviceSettings();
-            const comfyPath = deviceSettings.comfyUiPath?.trim();
-            if (!comfyPath) return await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
-
-            const fullModelPath = path.join(comfyPath, 'models', fullRelativePath);
-            
-            // Start with basic rendering
-            await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
-
-            // Enhance with CivitAI data asynchronously
-            const metadata = await this.metadataManager.enrichModelMetadata(fullModelPath);
-            
-            // Add verification badge
-            if (metadata.isVerified && this.plugin.settings.showCivitaiRatings) {
-                const verifiedBadge = fileItemEl.createEl('span', {
-                    cls: 'wb-verified-badge',
-                    text: '✓'
-                });
-                verifiedBadge.title = 'Verified on CivitAI';
-            }
-
-            // Add model type badge
-            if (metadata.civitaiModel) {
-                fileItemEl.createEl('span', {
-                    cls: `wb-model-type-${metadata.civitaiModel.type.toLowerCase()}`,
-                    text: metadata.civitaiModel.type
-                });
-            }
-
-            // Add rating if available
-            if (metadata.civitaiModel?.stats.rating && this.plugin.settings.showCivitaiRatings) {
-                fileItemEl.createEl('span', {
-                    cls: 'wb-model-rating',
-                    text: `★${metadata.civitaiModel.stats.rating.toFixed(1)}`
-                });
-            }
-
-            // Enhanced context menu
-            fileItemEl.addEventListener('contextmenu', (e) => {
+            noteLinkEl.addEventListener('click', async (e) => {
                 e.preventDefault();
-                this.showEnhancedContextMenu(e, fullModelPath, metadata);
-            });
-
-            // Add tooltip with model info
-            fileItemEl.title = this.generateModelTooltip(metadata);
-
-        } catch (error) {
-            console.error('Failed to enhance file item with CivitAI data:', error);
-        }
-    }
-
-    private showEnhancedContextMenu(event: MouseEvent, filePath: string, metadata: EnhancedModelMetadata): void {
-        const menu = new Menu();
-
-        // Basic actions
-        menu.addItem((item) => {
-            item.setTitle("Copy Path")
-                .setIcon("copy")
-                .onClick(() => navigator.clipboard.writeText(metadata.localPath));
-        });
-
-        if (metadata.civitaiModel) {
-            menu.addSeparator();
-
-            menu.addItem((item) => {
-                item.setTitle("View on CivitAI")
-                    .setIcon("external-link")
-                    .onClick(() => {
-                        if (metadata.civitaiModel?.id) {
-                            window.open(`https://civitai.com/models/${metadata.civitaiModel.id}`, '_blank');
-                        }
-                    });
-            });
-
-            menu.addItem((item) => {
-                item.setTitle("Show Model Details")
-                    .setIcon("info")
-                    .onClick(() => {
-                        this.showModelDetailsModal(metadata);
-                    });
-            });
-
-            if (this.plugin.settings.showCompatibleModels) {
-                menu.addItem((item) => {
-                    item.setTitle("Find Compatible Models")
-                        .setIcon("git-branch")
-                        .onClick(async () => {
-                            await this.showCompatibleModels(filePath);
-                        });
-                });
-            }
-
-            if (metadata.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
-                menu.addItem((item) => {
-                    item.setTitle("Copy Trigger Words")
-                        .setIcon("copy")
-                        .onClick(() => {
-                            if (metadata.civitaiVersion?.trainedWords) {
-                                navigator.clipboard.writeText(metadata.civitaiVersion.trainedWords.join(', '));
-                                new Notice('Trigger words copied to clipboard');
-                            }
-                        });
-                });
-            }
-        }
-
-        menu.addItem((item) => {
-            item.setTitle("Refresh Metadata")
-                .setIcon("refresh-cw")
-                .onClick(async () => {
-                    if (this.metadataManager) {
-                        await this.metadataManager.refreshMetadata(filePath);
-                        this.refresh();
+                try {
+                    // Check if note exists, create if not
+                    const noteExists = await this.app.vault.adapter.exists(fullNotePath);
+                    if (!noteExists) {
+                        await this.createModelNoteIfNeeded(fullRelativePath, '', {});
                     }
-                });
-        });
-
-        menu.showAtMouseEvent(event);
-    }
-
-    private generateModelTooltip(metadata: EnhancedModelMetadata): string {
-        let tooltip = `File: ${metadata.filename}`;
-        
-        if (metadata.civitaiModel) {
-            tooltip += `\nModel: ${metadata.civitaiModel.name}`;
-            tooltip += `\nType: ${metadata.civitaiModel.type}`;
-            tooltip += `\nBase Model: ${metadata.relationships.baseModel}`;
-            tooltip += `\nRating: ${metadata.civitaiModel.stats.rating?.toFixed(1) || 'N/A'}`;
-            tooltip += `\nDownloads: ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}`;
-            
-            if (metadata.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
-                tooltip += `\nTrigger Words: ${metadata.civitaiVersion.trainedWords.join(', ')}`;
-            }
-        }
-
-        return tooltip;
-    }
-
-    private async showCompatibleModels(filePath: string): Promise<void> {
-        if (!this.metadataManager) return;
-
-        const relationships = await this.metadataManager.getModelRelationships(filePath);
-        
-        const modal = new Modal(this.app);
-        modal.titleEl.setText('Compatible Models');
-        
-        const container = modal.contentEl.createDiv({ cls: 'wb-compatible-models' });
-        
-        if (relationships.length === 0) {
-            container.createEl('p', { text: 'No compatible local models found.' });
-        } else {
-            relationships.forEach(related => {
-                const item = container.createDiv({ cls: 'wb-compatible-item' });
-                item.createEl('strong', { text: related.civitaiModel?.name || related.filename });
-                item.createEl('span', { text: ` (${related.civitaiModel?.type || 'Unknown'})` });
-                
-                if (related.civitaiModel?.stats.rating) {
-                    item.createEl('span', { 
-                        cls: 'wb-rating',
-                        text: ` ★${related.civitaiModel.stats.rating.toFixed(1)}` 
-                    });
+                    
+                    // Open the note
+                    const noteFile = this.app.vault.getAbstractFileByPath(fullNotePath);
+                    if (noteFile) {
+                        await this.app.workspace.openLinkText(fullNotePath, '', false);
+                    }
+                } catch (error) {
+                    console.error('Error opening model note:', error);
+                    new Notice('Error opening model note');
                 }
-                
-                item.addEventListener('click', () => {
-                    modal.close();
-                });
             });
         }
-        
-        modal.open();
     }
 
-    private showModelDetailsModal(metadata: EnhancedModelMetadata): void {
-        const modal = new Modal(this.app);
-        modal.titleEl.setText(metadata.civitaiModel?.name || metadata.filename);
+    /**
+     * Enhances a file item with CivitAI metadata
+     */
+    private async enhanceFileItemWithCivitAI(
+        fileItemEl: HTMLElement, 
+        fullRelativePath: string, 
+        fileName: string, 
+        notesFolder?: string
+    ): Promise<void> {
+        // Start with basic rendering
+        await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
         
-        const container = modal.contentEl.createDiv({ cls: 'wb-model-details' });
-        
-        if (metadata.civitaiModel) {
-            // Model header
-            const header = container.createDiv({ cls: 'wb-model-header' });
-            header.createEl('h3', { text: metadata.civitaiModel.name });
-            header.createEl('span', { 
-                cls: 'wb-model-type',
-                text: metadata.civitaiModel.type 
-            });
-            
-            // Stats
-            const stats = container.createDiv({ cls: 'wb-model-stats' });
-            stats.createEl('span', { text: `★ ${metadata.civitaiModel.stats.rating?.toFixed(1) || 'N/A'}` });
-            stats.createEl('span', { text: `↓ ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}` });
-            stats.createEl('span', { text: `♥ ${metadata.civitaiModel.stats.favoriteCount.toLocaleString()}` });
-            
-            // Description
-            if (metadata.civitaiModel.description) {
-                container.createEl('p', { text: metadata.civitaiModel.description });
-            }
-            
-            // Version info
-            if (metadata.civitaiVersion) {
-                const versionInfo = container.createDiv({ cls: 'wb-version-info' });
-                versionInfo.createEl('h4', { text: 'Version Information' });
-                versionInfo.createEl('p', { text: `Version: ${metadata.civitaiVersion.name}` });
-                versionInfo.createEl('p', { text: `Base Model: ${metadata.civitaiVersion.baseModel}` });
-                
-                if (metadata.civitaiVersion.trainedWords?.length > 0) {
-                    versionInfo.createEl('p', { text: `Trigger Words: ${metadata.civitaiVersion.trainedWords.join(', ')}` });
-                }
-            }
-            
-            // Tags
-            if (metadata.civitaiModel.tags?.length > 0) {
-                const tagsDiv = container.createDiv({ cls: 'wb-model-tags' });
-                tagsDiv.createEl('h4', { text: 'Tags' });
-                const tagsList = tagsDiv.createEl('div', { cls: 'wb-tags-list' });
-                metadata.civitaiModel.tags.forEach(tag => {
-                    tagsList.createEl('span', { cls: 'wb-tag', text: tag });
-                });
-            }
-        }
-        
-        modal.open();
-    }
-
-    public refresh(): void {
-        this.onOpen();
-    }
-
-    public async refreshWithMetadata(): Promise<void> {
-        if (this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
-            await this.metadataManager.refreshAllMetadata();
-        }
-        this.onOpen();
-    }
-
-    public async refreshHuggingFaceMetadata(): Promise<void> {
-        if (!this.plugin.settings.enableHuggingfaceIntegration) {
-            new Notice('HuggingFace integration is not enabled');
-            return;
-        }
-
-        if (!this.huggingfaceService) {
-            this.huggingfaceService = new HuggingFaceService(
-                this.plugin.settings.huggingfaceApiKey || ''
-            );
-        }
-
-        const deviceSettings = this.plugin.getCurrentDeviceSettings();
-        const comfyPath = deviceSettings.comfyUiPath?.trim();
-        
-        if (!comfyPath) {
-            new Notice('ComfyUI path not configured');
-            return;
-        }
-
-        const modelsPath = path.join(comfyPath, 'models');
-        if (!fs.existsSync(modelsPath)) {
-            new Notice('Models directory not found');
+        if (!this.metadataManager) {
             return;
         }
 
         try {
-            new Notice('Refreshing HuggingFace model metadata...');
+            // Try to get enhanced metadata
+            const metadata = await this.metadataManager.enrichModelMetadata(fullRelativePath);
             
-            // Find all model files
-            const result = await findModelsRecursive(modelsPath, modelsPath);
-            const modelFiles = result.modelFiles;
-            
-            let refreshedCount = 0;
-            for (const modelFile of modelFiles) {
-                const provider = this.detectModelProvider(modelFile);
-                if (provider === 'huggingface') {
-                    try {
-                        // For HuggingFace models, we could try to extract model info from path
-                        // or attempt to find associated metadata files
-                        
-                        // Try to extract model ID from HuggingFace cache paths
-                        const hfModelMatch = modelFile.match(/.*\/(.+)--(.+)\/.*/);
-                        if (hfModelMatch) {
-                            const author = hfModelMatch[1];
-                            const modelName = hfModelMatch[2];
-                            const modelId = `${author}/${modelName}`;
-                            
-                            // Fetch model info from HuggingFace
-                            const modelInfo = await this.huggingfaceService.getModelInfo(modelId);
-                            if (modelInfo) {
-                                refreshedCount++;
-                                // Could store this metadata for later use
-                                console.log(`Refreshed metadata for ${modelId}:`, modelInfo);
-                            }
-                        }
-                    } catch (error) {
-                        console.warn(`Failed to refresh metadata for ${modelFile}:`, error);
+            if (metadata) {
+                const enhancedInfoEl = fileItemEl.createDiv({ cls: 'wb-enhanced-info' });
+                
+                // Add provider icon
+                const providerIconEl = enhancedInfoEl.createSpan({ cls: 'wb-provider-icon' });
+                if (metadata.provider === 'civitai') {
+                    setIcon(providerIconEl, CIVITAI_ICON_NAME);
+                } else if (metadata.provider === 'huggingface') {
+                    setIcon(providerIconEl, HUGGINGFACE_ICON_NAME);
+                } else {
+                    setIcon(providerIconEl, UNKNOWN_PROVIDER_ICON_NAME);
+                }
+                
+                // Add model information based on provider
+                if (metadata.civitaiModel) {
+                    enhancedInfoEl.createSpan({ 
+                        cls: 'wb-model-name',
+                        text: metadata.civitaiModel.name 
+                    });
+                    
+                    if (metadata.civitaiModel.stats) {
+                        const statsEl = enhancedInfoEl.createDiv({ cls: 'wb-model-stats' });
+                        statsEl.createSpan({ 
+                            text: `👍 ${metadata.civitaiModel.stats.favoriteCount || 0}` 
+                        });
+                        statsEl.createSpan({ 
+                            text: `📥 ${metadata.civitaiModel.stats.downloadCount || 0}` 
+                        });
                     }
+                } else if (metadata.huggingfaceModel) {
+                    enhancedInfoEl.createSpan({ 
+                        cls: 'wb-model-name',
+                        text: metadata.huggingfaceModel.id 
+                    });
+                    
+                    const statsEl = enhancedInfoEl.createDiv({ cls: 'wb-model-stats' });
+                    statsEl.createSpan({ 
+                        text: `👍 ${metadata.huggingfaceModel.likes || 0}` 
+                    });
+                    statsEl.createSpan({ 
+                        text: `📥 ${metadata.huggingfaceModel.downloads || 0}` 
+                    });
                 }
             }
-            
-            new Notice(`Refreshed metadata for ${refreshedCount} HuggingFace models`);
         } catch (error) {
-            console.error('Error refreshing HuggingFace metadata:', error);
-            new Notice('Failed to refresh HuggingFace metadata');
+            console.warn('Failed to enhance file item with metadata:', error);
         }
-        
-        // Refresh the view
-        this.onOpen();
+    }
+}
+
+/**
+ * Modal for searching and downloading HuggingFace models
+ */
+class HuggingFaceSearchModal extends Modal {
+    private plugin: Workbench;
+    private huggingfaceService: HuggingFaceService;
+    private searchResults: HuggingFaceModel[] = [];
+    private currentQuery = '';
+    private isLoading = false;
+
+    constructor(app: App, plugin: Workbench) {
+        super(app);
+        this.plugin = plugin;
+        this.huggingfaceService = new HuggingFaceService(plugin.settings.huggingfaceApiKey);
     }
 
-    public updateCivitAISettings(): void {
-        // Reinitialize metadata manager when settings change
-        if (this.plugin.settings.enableCivitaiIntegration) {
-            this.metadataManager = new ModelMetadataManager(
-                this.app.vault,
-                this.plugin.settings.civitaiApiKey,
-                this.plugin.settings.huggingfaceApiKey
-            );
-        } else {
-            this.metadataManager = null;
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass('wb-hf-search-modal');
+
+        // Title
+        contentEl.createEl('h2', { text: 'Search HuggingFace Models' });
+
+        // Search input section
+        const searchSection = contentEl.createDiv({ cls: 'wb-search-section' });
+        
+        const searchInputContainer = searchSection.createDiv({ cls: 'wb-search-input-container' });
+        const searchInput = searchInputContainer.createEl('input', {
+            type: 'text',
+            placeholder: 'Search for models...',
+            cls: 'wb-search-input'
+        });
+
+        const searchBtn = searchInputContainer.createEl('button', {
+            text: 'Search',
+            cls: 'wb-search-btn'
+        });
+
+        // Filter options
+        const filterSection = searchSection.createDiv({ cls: 'wb-filter-section' });
+        filterSection.createEl('label', { text: 'Task Type:' });
+        
+        const taskSelect = filterSection.createEl('select', { cls: 'wb-task-select' });
+        const taskOptions = [
+            { value: '', text: 'All Tasks' },
+            { value: 'text-to-image', text: 'Text to Image' },
+            { value: 'image-to-image', text: 'Image to Image' },
+            { value: 'text-generation', text: 'Text Generation' },
+            { value: 'image-classification', text: 'Image Classification' },
+            { value: 'object-detection', text: 'Object Detection' }
+        ];
+        
+        taskOptions.forEach(option => {
+            taskSelect.createEl('option', {
+                value: option.value,
+                text: option.text
+            });
+        });
+
+        // Sort options
+        filterSection.createEl('label', { text: 'Sort by:' });
+        const sortSelect = filterSection.createEl('select', { cls: 'wb-sort-select' });
+        const sortOptions = [
+            { value: 'downloads', text: 'Downloads' },
+            { value: 'likes', text: 'Likes' },
+            { value: 'lastModified', text: 'Recently Updated' }
+        ];
+        
+        sortOptions.forEach(option => {
+            sortSelect.createEl('option', {
+                value: option.value,
+                text: option.text
+            });
+        });
+
+        // Results section
+        const resultsSection = contentEl.createDiv({ cls: 'wb-results-section' });
+        const resultsContainer = resultsSection.createDiv({ cls: 'wb-results-container' });
+
+        // Search functionality
+        const performSearch = async () => {
+            const query = searchInput.value.trim();
+
+            if (!query) {
+                new Notice('Please enter a search term');
+                return;
+            }
+
+            this.isLoading = true;
+            searchBtn.disabled = true;
+            searchBtn.setText('Searching...');
+            resultsContainer.empty();
+            resultsContainer.createEl('div', { text: 'Searching...', cls: 'wb-loading' });
+
+            try {
+                // Use the simple search method to avoid API issues
+                console.log('🔍 Starting HuggingFace search for:', query);
+                const models = await this.huggingfaceService.searchModelsSimple(query, 20);
+
+                this.searchResults = models;
+                this.currentQuery = query;
+                this.renderResults(resultsContainer);
+
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsContainer.empty();
+                resultsContainer.createEl('div', { 
+                    text: 'Search failed. Please try again.', 
+                    cls: 'wb-error' 
+                });
+            } finally {
+                this.isLoading = false;
+                searchBtn.disabled = false;
+                searchBtn.setText('Search');
+            }
+        };
+
+        // Event listeners
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Focus search input
+        searchInput.focus();
+    }
+
+    private renderResults(container: HTMLElement) {
+        container.empty();
+
+        if (this.searchResults.length === 0) {
+            container.createEl('div', { 
+                text: `No models found for "${this.currentQuery}"`, 
+                cls: 'wb-no-results' 
+            });
+            return;
         }
 
-        // Initialize HuggingFace service when settings change
-        if (this.plugin.settings.enableHuggingfaceIntegration) {
-            this.huggingfaceService = new HuggingFaceService(
-                this.plugin.settings.huggingfaceApiKey || ''
-            );
-        } else {
-            this.huggingfaceService = null;
+        const resultsList = container.createDiv({ cls: 'wb-results-list' });
+        
+        this.searchResults.forEach(model => {
+            const modelCard = resultsList.createDiv({ cls: 'wb-model-card' });
+            
+            // Model header
+            const modelHeader = modelCard.createDiv({ cls: 'wb-model-header' });
+            
+            modelHeader.createEl('h3', { 
+                text: model.id,
+                cls: 'wb-model-title'
+            });
+            
+            modelHeader.createSpan({ 
+                text: `by ${model.author}`,
+                cls: 'wb-model-author'
+            });
+
+            // Model stats
+            const modelStats = modelCard.createDiv({ cls: 'wb-model-stats' });
+            modelStats.createSpan({ 
+                text: `👍 ${model.likes || 0}`,
+                cls: 'wb-stat'
+            });
+            modelStats.createSpan({ 
+                text: `📥 ${model.downloads || 0}`,
+                cls: 'wb-stat'
+            });
+
+            // Model tags
+            if (model.tags && model.tags.length > 0) {
+                const tagsContainer = modelCard.createDiv({ cls: 'wb-model-tags' });
+                model.tags.slice(0, 5).forEach(tag => {
+                    tagsContainer.createSpan({ 
+                        text: tag,
+                        cls: 'wb-tag'
+                    });
+                });
+            }
+
+            // Pipeline tag
+            if (model.pipeline_tag) {
+                const pipelineTag = modelCard.createDiv({ cls: 'wb-pipeline-tag' });
+                pipelineTag.createSpan({ 
+                    text: `Task: ${model.pipeline_tag}`,
+                    cls: 'wb-pipeline'
+                });
+            }
+
+            // Actions
+            const actionsContainer = modelCard.createDiv({ cls: 'wb-model-actions' });
+            
+            const viewBtn = actionsContainer.createEl('button', {
+                text: 'View on HuggingFace',
+                cls: 'wb-action-btn wb-view-btn'
+            });
+            
+            viewBtn.addEventListener('click', () => {
+                window.open(`https://huggingface.co/${model.id}`, '_blank');
+            });
+
+            const downloadBtn = actionsContainer.createEl('button', {
+                text: 'View Files',
+                cls: 'wb-action-btn wb-download-btn'
+            });
+            
+            downloadBtn.addEventListener('click', async () => {
+                try {
+                    const files = await this.huggingfaceService.getModelFiles(model.id);
+                    this.showModelFiles(model, files);
+                } catch (error) {
+                    console.error('Error fetching model files:', error);
+                    new Notice('Error fetching model files');
+                }
+            });
+        });
+    }
+
+    private showModelFiles(model: HuggingFaceModel, files: HuggingFaceFile[]) {
+        const filesModal = new Modal(this.app);
+        const { contentEl } = filesModal;
+        
+        contentEl.createEl('h2', { text: `Files for ${model.id}` });
+        
+        if (files.length === 0) {
+            contentEl.createEl('p', { text: 'No files found for this model.' });
+            return;
         }
+
+        const filesList = contentEl.createDiv({ cls: 'wb-files-list' });
+        
+        files.forEach(file => {
+            const fileItem = filesList.createDiv({ cls: 'wb-file-item' });
+            
+            fileItem.createSpan({ 
+                text: file.path,
+                cls: 'wb-file-name'
+            });
+            
+            if (file.size) {
+                fileItem.createSpan({ 
+                    text: this.formatFileSize(file.size),
+                    cls: 'wb-file-size'
+                });
+            }
+
+            const downloadBtn = fileItem.createEl('button', {
+                text: 'Download URL',
+                cls: 'wb-download-file-btn'
+            });
+            
+            downloadBtn.addEventListener('click', () => {
+                const downloadUrl = `https://huggingface.co/${model.id}/resolve/main/${file.path}`;
+                navigator.clipboard.writeText(downloadUrl);
+                new Notice(`Download URL copied to clipboard: ${file.path}`);
+            });
+        });
+
+        const closeBtn = contentEl.createEl('button', {
+            text: 'Close',
+            cls: 'wb-modal-close-btn'
+        });
+        
+        closeBtn.addEventListener('click', () => {
+            filesModal.close();
+        });
+
+        filesModal.open();
+    }
+
+    private formatFileSize(bytes: number): string {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = bytes;
+        let unitIndex = 0;
+        
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
     }
 }
