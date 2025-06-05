@@ -18,7 +18,14 @@ export class ModelListView extends ItemView {
     private metadataManager: ModelMetadataManager | null = null;
     private huggingfaceService: HuggingFaceService | null = null;
     private treeRenderer: ModelTreeRenderer | null = null;
-    private noteManager: ModelNoteManager | null = null;
+    private _noteManager: ModelNoteManager | null = null;
+    
+    /**
+     * Gets the note manager used by this view
+     */
+    get noteManager(): ModelNoteManager | null {
+        return this._noteManager;
+    }
 
     constructor(leaf: WorkspaceLeaf, app: App, plugin: Workbench) {
         super(leaf);
@@ -54,7 +61,7 @@ export class ModelListView extends ItemView {
 
         // Initialize the sub-components
         this.treeRenderer = new ModelTreeRenderer(this.plugin, this.metadataManager);
-        this.noteManager = new ModelNoteManager(this.plugin, this.metadataManager);
+        this._noteManager = new ModelNoteManager(this.plugin, this.metadataManager);
 
         const container = this.contentEl;
         container.empty();
@@ -180,9 +187,9 @@ export class ModelListView extends ItemView {
             // This has been disabled to prevent creating notes with empty metadata during folder scan.
             // Notes are now only created when users click on model names in the UI, using pre-found API metadata.
             /*
-            if (modelNotesFolderPath && modelFiles.length > 0 && this.noteManager) {
+            if (modelNotesFolderPath && modelFiles.length > 0 && this._noteManager) {
                 new Notice(`Creating/checking notes for ${modelFiles.length} models...`, 3000);
-                const noteManager = this.noteManager; // Capture reference
+                const noteManager = this._noteManager; // Capture reference
                 const noteCreationPromises = modelFiles.map(relativeModelPath =>
                     // Pass modelsPath and directoryInfo to the function
                     noteManager.createModelNoteIfNeeded(relativeModelPath, modelsPath, directoryInfo)

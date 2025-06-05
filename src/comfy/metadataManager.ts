@@ -431,15 +431,20 @@ export class ModelMetadataManager {
         }
     }
 
-    async refreshAllMetadata(): Promise<void> {
+    async refreshAllMetadata(targetProvider?: 'civitai' | 'huggingface'): Promise<void> {
         // Clear all caches
         this.metadataCache.clear();
         this.civitaiService.clearCache();
         
-        console.log('Cleared all metadata caches');
+        console.log(`Cleared all metadata caches${targetProvider ? ` for ${targetProvider} refresh` : ''}`);
         
         // Save empty cache to disk
         await this.saveMetadataCache();
+
+        // If a specific provider is requested, we'll refresh all models with that provider
+        if (targetProvider) {
+            console.log(`Starting mass refresh of all models using ${targetProvider} provider...`);
+        }
     }
 
     async cleanupNonModelMetadata(): Promise<void> {
@@ -624,6 +629,86 @@ export class ModelMetadataManager {
             }
         } catch (error) {
             console.error('🎨 MetadataManager: Failed to enrich with CivitAI:', error);
+        }
+    }
+
+    /**
+     * Enriches model metadata using a specific provider.
+     * This is a public method that allows targeting a specific provider for metadata enrichment.
+     * 
+     * @param filePath Full path to the model file
+     * @param targetProvider The specific provider to use for metadata enrichment
+     * @param forceRefresh Whether to refresh metadata even if cached data is available
+     * @returns The enriched metadata
+     */
+    async enrichModelMetadataWithProvider(
+        filePath: string, 
+        targetProvider: 'civitai' | 'huggingface',
+        forceRefresh = true
+    ): Promise<EnhancedModelMetadata> {
+        const filename = path.basename(filePath);
+        
+        // Only process actual model files
+        if (!isModelFile(filename)) {
+            throw new Error(`File ${filename} is not a model file and should not be processed by metadata manager`);
+        }
+        
+        console.log(`📋 MetadataManager: Enriching metadata for "${filename}" using specific provider: ${targetProvider}`);
+        
+        // Create a base metadata object
+        const metadata: EnhancedModelMetadata = {
+            localPath: filePath,
+            filename: filename,
+            provider: targetProvider, // Set the requested provider
+            relationships: {
+                childModels: [],
+                compatibleModels: [],
+                baseModel: 'Unknown'
+            },
+            isVerified: false,
+            lastSynced: new Date()
+        };
+        
+        try {
+            console.log(`📋 MetadataManager: Calculating file hash for "${filename}"...`);
+            // Calculate file hash
+            metadata.hash = await FileHashCalculator.calculateSHA256(filePath);
+            console.log(`📋 MetadataManager: File hash calculated: ${metadata.hash}`);
+            
+            // Call the appropriate provider-specific enrichment method directly
+            if (targetProvider === 'huggingface') {
+                console.log(`📋 MetadataManager: Searching HuggingFace specifically for "${filename}"`);
+                await this.enrichWithHuggingFace(metadata, filename);
+                
+                if (!metadata.huggingfaceModel) {
+                    console.warn(`📋 MetadataManager: No HuggingFace metadata found for "${filename}"`);
+                }
+            } else if (targetProvider === 'civitai') {
+                console.log(`📋 MetadataManager: Searching CivitAI specifically for "${filename}"`);
+                await this.enrichWithCivitAI(metadata, filename);
+                
+                if (!metadata.civitaiModel) {
+                    console.warn(`📋 MetadataManager: No CivitAI metadata found for "${filename}"`);
+                }
+            }
+            
+            // Only cache the metadata if we found results
+            if ((targetProvider === 'huggingface' && metadata.huggingfaceModel) || 
+                (targetProvider === 'civitai' && metadata.civitaiModel)) {
+                this.metadataCache.set(filePath, metadata);
+                await this.saveMetadataCache();
+                console.log(`📋 MetadataManager: Successfully cached metadata for "${filename}" with provider: ${targetProvider}`);
+            } else {
+                console.warn(`📋 MetadataManager: No metadata found for "${filename}" from provider: ${targetProvider}`);
+                // Set provider back to unknown if no results were found
+                metadata.provider = 'unknown';
+            }
+            
+            return metadata;
+        } catch (error) {
+            console.error(`📋 MetadataManager: Failed to enrich metadata for ${filePath} using ${targetProvider}:`, error);
+            metadata.provider = 'unknown'; // Reset provider if enrichment fails
+            return metadata;
         }
     }
 }

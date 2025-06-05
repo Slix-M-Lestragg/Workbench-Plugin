@@ -1,6 +1,7 @@
 // Imports
 // -------------------------
 import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App, setIcon } from 'obsidian'; // Added setIcon
+import * as path from 'path';
 import {
     WorkbenchSettings,
     DEFAULT_SETTINGS,
@@ -186,6 +187,13 @@ export default class Workbench extends Plugin {
             if (file instanceof TFile && file.extension === 'json') {
                 this.addCopyAndOpenComfyMenuItem(menu, file);
                 this.addRunWorkflowMenuItem(menu, file);
+            }
+        }));
+
+        // Register file-modify event to detect changes to model notes
+        this.registerEvent(this.app.vault.on('modify', async (file) => {
+            if (file instanceof TFile && file.extension === 'md') {
+                await this.handleModelNoteModification(file);
             }
         }));
 
@@ -390,5 +398,65 @@ export default class Workbench extends Plugin {
                 (view as { updateCivitAISettings: () => void }).updateCivitAISettings();
             }
         });
+    }
+
+    /**
+     * Handles modifications to model notes, specifically checking for provider changes
+     * that require reprocessing the model metadata.
+     * @param file The modified markdown file
+     */
+    private async handleModelNoteModification(file: TFile): Promise<void> {
+        const deviceSettings = this.getCurrentDeviceSettings();
+        const modelNotesFolder = deviceSettings.modelNotesFolderPath?.trim();
+        
+        // If model notes folder isn't set, we can't determine if this is a model note
+        if (!modelNotesFolder) {
+            console.log("Model notes folder not set in settings, skipping note modification check");
+            return;
+        }
+        
+        // Check if the modified file is in the model notes folder
+        const filePath = file.path;
+        if (!filePath.startsWith(modelNotesFolder)) {
+            // Not a model note or it's outside the configured folder
+            return; 
+        }
+        
+        try {
+            console.log(`Detected modification to potential model note: ${filePath}`);
+            
+            // Just pass the full file path to the ModelNoteManager
+            // The manager will extract the model path from the frontmatter
+            // We don't need to calculate a relative path here
+            
+            // Find and process with the appropriate ModelNoteManager
+            const modelListLeaves = this.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
+            if (modelListLeaves.length === 0) {
+                console.log("No ModelListView instances found to process note modification");
+                return;
+            }
+            
+            let processed = false;
+            
+            for (const leaf of modelListLeaves) {
+                const view = leaf.view as ModelListView;
+                if (view && view.noteManager) {
+                    // This might be a provider change, let the note manager handle it
+                    const result = await view.noteManager.detectAndProcessProviderChange(filePath);
+                    
+                    if (result) {
+                        processed = true;
+                        new Notice(`Provider change detected in note: ${path.basename(filePath)}. Model metadata has been refreshed.`, 6000);
+                        break; // Stop after successful processing
+                    }
+                }
+            }
+            
+            if (!processed) {
+                console.log(`No model found or no provider change detected for note: ${filePath}`);
+            }
+        } catch (error) {
+            console.error(`Error handling model note modification for ${filePath}:`, error);
+        }
     }
 }

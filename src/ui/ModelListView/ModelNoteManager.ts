@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type Workbench from '../../main';
 import { ModelMetadataManager } from '../../comfy/metadataManager';
-import { EnhancedModelMetadata } from '../../comfy/types';
+import { EnhancedModelMetadata, ModelProvider } from '../../comfy/types';
 
 /**
  * Handles the creation and management of model notes
@@ -140,13 +140,13 @@ export class ModelNoteManager {
         }
         
         // Build frontmatter in the new format
-        let frontmatter = `---\nprovider:`;
+        let frontmatter = `---\n`;
         
-        // Add provider as array
+        // Add provider as plain text
         if (enhancedMetadata?.provider && enhancedMetadata.provider !== 'unknown') {
-            frontmatter += `\n  - ${enhancedMetadata.provider}`;
+            frontmatter += `provider: ${enhancedMetadata.provider}`;
         } else {
-            frontmatter += `\n  - unknown`;
+            frontmatter += `provider: unknown`;
         }
         
         // Add common fields based on provider
@@ -222,6 +222,11 @@ export class ModelNoteManager {
 | \`= this.model_type\`   | \`= this.author\`         | \`= this.provider\`         | \`= this.source\`      | \`= this.license\`         | \`= this.downloads\`         |  \`= this.likes\` |
 
 **Tags** : \`$= "#" + dv.current().tags.join(" #")\`
+
+> [!tip] Provider Change Feature
+> You can manually change the metadata source by editing the provider field in the frontmatter to either civitai or huggingface. 
+> When you save the note, Workbench will automatically try to reprocess the model metadata from the selected provider.
+
 ## Usage Notes
 
 *Add your notes about using this model here.*
@@ -355,13 +360,13 @@ export class ModelNoteManager {
         }
         
         // Build frontmatter in the new format
-        let frontmatter = `---\nprovider:`;
+        let frontmatter = `---\n`;
         
-        // Add provider as array
+        // Add provider as plain text
         if (metadata?.provider && metadata.provider !== 'unknown') {
-            frontmatter += `\n  - ${metadata.provider}`;
+            frontmatter += `provider: ${metadata.provider}`;
         } else {
-            frontmatter += `\n  - unknown`;
+            frontmatter += `provider: unknown`;
         }
         
         // Add common fields based on provider
@@ -437,6 +442,11 @@ export class ModelNoteManager {
 | \`= this.model_type\`   | \`= this.author\`         | \`= this.provider\`         | \`= this.source\`      | \`= this.license\`         | \`= this.downloads\`         |  \`= this.likes\` |
 
 **Tags** : \`$= "#" + dv.current().tags.join(" #")\`
+
+> [!tip] Provider Change Feature
+> You can manually change the metadata source by editing the provider field in the frontmatter to either civitai or huggingface. 
+> When you save the note, Workbench will automatically try to reprocess the model metadata from the selected provider.
+
 ## Usage Notes
 
 *Add your notes about using this model here.*
@@ -465,7 +475,7 @@ export class ModelNoteManager {
         if (pathParts.includes('controlnet')) return 'ControlNet';
         if (pathParts.includes('clip')) return 'CLIP';
         if (pathParts.includes('unet')) return 'UNet';
-        if (pathParts.includes('LLM')) return 'Large Language Model';
+        if (pathParts.includes('llm')) return 'Large Language Model';
         
         // Infer from file extension
         switch (extension) {
@@ -546,30 +556,229 @@ export class ModelNoteManager {
     }
 
     /**
-     * Legacy method: Detects model provider based on file path patterns.
+     * Detects the model provider based on file path patterns.
      * This is used as a fallback when note-based provider detection fails.
      * @param fullRelativePath The relative path to the model file
-     * @returns The provider type: 'civitai', 'huggingface', or 'unknown'
+     * @returns The provider type: 'civitai', 'huggingface'
      */
     private detectModelProviderFromPath(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
-        const pathLower = fullRelativePath.toLowerCase();
-        
-        // HuggingFace patterns
-        if (pathLower.includes('huggingface') || 
-            pathLower.includes('hf-hub') ||
-            pathLower.includes('transformers') ||
-            pathLower.match(/.*\/.*--.*\/.*/) || // HF cache pattern: author--model/version
-            pathLower.includes('diffusers')) {
-            return 'huggingface';
-        }
-        
-        // CivitAI patterns (often have hash-based names or specific folders)
-        if (pathLower.includes('civitai') ||
-            pathLower.match(/^[a-f0-9]{8,}\./) || // Hash-based filenames
-            pathLower.includes('lora') && pathLower.match(/\d+\.safetensors$/)) {
+        const pathParts = fullRelativePath.split('/');
+        const fileName = path.basename(fullRelativePath).toLowerCase();
+
+        // Heuristic checks based on file path and name patterns
+        if (pathParts.includes('civitai') || fileName.includes('civitai')) {
             return 'civitai';
         }
-        
+        if (pathParts.includes('huggingface') || fileName.includes('huggingface')) {
+            return 'huggingface';
+        }
+
+        // Unknown provider
         return 'unknown';
+    }
+
+    /**
+     * Detects if a provider has been manually changed in a note and reprocesses the model metadata.
+     * This function reads the provider and model_path from the note's frontmatter.
+     * @param notePath The path to the note file
+     * @returns True if the note was reprocessed, false otherwise
+     */
+    async detectAndProcessProviderChange(notePath: string): Promise<boolean> {
+        try {
+            // Ensure we have a metadata manager
+            if (!this.metadataManager) {
+                console.warn("Cannot process provider change: No metadata manager available");
+                return false;
+            }
+
+            // Get the note content
+            const noteFile = this.plugin.app.vault.getAbstractFileByPath(notePath);
+            if (!noteFile || !(noteFile instanceof TFile)) {
+                console.warn(`Note not found or not a file: ${notePath}`);
+                return false;
+            }
+            
+            const noteContent = await this.plugin.app.vault.read(noteFile);
+            
+            // Extract provider from frontmatter
+            const frontmatterMatch = noteContent.match(/^---\n([\s\S]*?)\n---/);
+            if (!frontmatterMatch) {
+                console.warn(`No frontmatter found in note: ${notePath}`);
+                return false;
+            }
+            
+            const frontmatter = frontmatterMatch[1];
+            // Improved regex to handle various formats like 'provider: civitai', 'provider: "civitai"', etc.
+            const providerMatch = frontmatter.match(/provider:\s*["']?([^"'\n]+)["']?/);
+            if (!providerMatch) {
+                console.warn(`No provider found in frontmatter: ${notePath}`);
+                new Notice(`No provider field found in frontmatter. Cannot process provider change.`, 4000);
+                return false;
+            }
+            
+            // Get the provider from the note
+            const noteProvider = providerMatch[1].trim().toLowerCase();
+            if (noteProvider !== 'civitai' && noteProvider !== 'huggingface' && noteProvider !== 'unknown') {
+                console.warn(`Invalid provider in note (must be civitai, huggingface, or unknown): ${noteProvider}`);
+                new Notice(`Invalid provider: "${noteProvider}". Provider must be "civitai", "huggingface", or "unknown".`, 5000);
+                return false;
+            }
+            
+            // Get the model_path from the frontmatter - this is required for proper operation
+            const modelPathMatch = frontmatter.match(/model_path:\s*([^\n]+)/);
+            if (!modelPathMatch) {
+                // Without model_path in frontmatter, we can't accurately locate the model file
+                console.warn(`No model_path found in frontmatter. Cannot process provider change for note: ${notePath}`);
+                new Notice(`Cannot process provider change: No model_path in frontmatter`, 4000);
+                return false;
+            }
+            
+            // Use the path from the frontmatter
+            let modelPath = modelPathMatch[1].trim();
+            // Remove any quotes if present
+            modelPath = modelPath.replace(/^["']|["']$/g, '');
+            
+            console.log(`Using model_path from frontmatter: "${modelPath}"`);
+            
+            // Get the full model path for metadata lookup
+            const deviceSettings = this.plugin.getCurrentDeviceSettings();
+            const comfyPath = deviceSettings.comfyUiPath?.trim();
+            if (!comfyPath) {
+                console.warn("ComfyUI path not set in settings");
+                return false;
+            }
+            
+            const fullModelPath = path.join(comfyPath, 'models', modelPath);
+            
+            // Check if model exists
+            try {
+                console.log(`Checking if model exists at: ${fullModelPath}`);
+                await fs.promises.access(fullModelPath);
+                console.log(`✅ Model file found at ${fullModelPath}`);
+            } catch (err) {
+                const errorMessage = `Model file not found at ${fullModelPath}. Cannot process provider change.`;
+                console.warn(errorMessage);
+                new Notice(errorMessage, 5000);
+                return false;
+            }
+            
+            // Get current metadata
+            console.log(`Getting current metadata for model: ${fullModelPath}`);
+            const currentMetadata = await this.metadataManager.enrichModelMetadata(fullModelPath, false);
+            
+            // If provider is set to unknown, no reprocessing needed
+            if (noteProvider === 'unknown') {
+                console.log(`Provider set to 'unknown', no reprocessing needed`);
+                new Notice(`Provider set to 'unknown'. No metadata refresh will be performed.\nTo fetch metadata, change provider to 'civitai' or 'huggingface'.`, 5000);
+                return false;
+            }
+            
+            // Check if provider has been changed
+            if (currentMetadata.provider === noteProvider as ModelProvider) {
+                console.log(`Provider unchanged (${noteProvider}), no reprocessing needed`);
+                return false;
+            }
+            
+            console.log(`Provider changed from ${currentMetadata.provider} to ${noteProvider}, reprocessing model metadata...`);
+            new Notice(`Provider changed to ${noteProvider}. Reprocessing model metadata for ${path.basename(modelPath)}...`, 5000);
+            
+            // Force refresh using the target provider
+            const newMetadata = await this.forceRefreshWithTargetProvider(fullModelPath, noteProvider as ModelProvider);
+            
+            if (newMetadata) {
+                // Regenerate note content with new metadata
+                const notesFolder = deviceSettings.modelNotesFolderPath?.trim();
+                if (!notesFolder) {
+                    console.warn("Model notes folder not set in settings");
+                    return false;
+                }
+                
+                // Delete and recreate the note
+                await this.plugin.app.vault.delete(noteFile);
+                
+                // Get directory structure info (needed for note creation)
+                const modelsBasePath = path.join(comfyPath, 'models');
+                const directoryInfo = {}; // We can pass an empty object here as it's not critical
+
+                // Create a new note with the refreshed metadata
+                await this.createModelNoteWithMetadata(modelPath, modelsBasePath, directoryInfo, newMetadata);
+                
+                new Notice(`Model metadata reprocessed with ${noteProvider} provider`, 3000);
+                return true;
+            } else {
+                new Notice(`Failed to find metadata for ${path.basename(modelPath)} using ${noteProvider} provider`, 5000);
+                return false;
+            }
+        } catch (error) {
+            console.error("Error processing provider change:", error);
+            new Notice(`Error reprocessing model metadata: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * Forces a metadata refresh using a specific target provider
+     * @param fullModelPath Full path to the model file
+     * @param targetProvider The provider to use for metadata lookup
+     * @returns Updated model metadata or null if no metadata found
+     */
+    private async forceRefreshWithTargetProvider(fullModelPath: string, targetProvider: ModelProvider): Promise<EnhancedModelMetadata | null> {
+        if (!this.metadataManager) {
+            console.error("Metadata manager is not available");
+            new Notice("Cannot search for metadata: Metadata manager not available", 3000);
+            return null;
+        }
+        
+        // Skip if provider is "unknown" - can't search with that
+        if (targetProvider === 'unknown') {
+            console.warn("Cannot search with 'unknown' provider");
+            new Notice("Cannot search with 'unknown' provider. Please specify 'civitai' or 'huggingface'", 4000);
+            return null;
+        }
+        
+        try {
+            // Show a notice to the user about what's happening
+            new Notice(`Searching for metadata using ${targetProvider} provider. This may take a moment...`, 3000);
+            console.log(`🔍 Searching for metadata from ${targetProvider} for model: ${fullModelPath}`);
+            
+            // Check if API keys are set for the selected provider
+            const settings = this.plugin.settings;
+            if (targetProvider === 'civitai' && (!settings.enableCivitaiIntegration || !settings.civitaiApiKey)) {
+                const errorMsg = `CivitAI integration is ${settings.enableCivitaiIntegration ? 'enabled but API key is missing' : 'disabled'}`;
+                console.warn(errorMsg);
+                new Notice(`Cannot search CivitAI: ${errorMsg}`, 4000);
+                return null;
+            }
+            
+            if (targetProvider === 'huggingface' && (!settings.enableHuggingfaceIntegration || !settings.huggingfaceApiKey)) {
+                const errorMsg = `HuggingFace integration is ${settings.enableHuggingfaceIntegration ? 'enabled but API key is missing' : 'disabled'}`;
+                console.warn(errorMsg);
+                new Notice(`Cannot search HuggingFace: ${errorMsg}`, 4000);
+                return null;
+            }
+            
+            // Use the new public method to search using a specific provider
+            // Cast targetProvider to the expected type since we've already filtered out 'unknown'
+            console.log(`Using enrichModelMetadataWithProvider to search ${targetProvider} for model: ${fullModelPath}`);
+            const metadata = await this.metadataManager.enrichModelMetadataWithProvider(
+                fullModelPath,
+                targetProvider as 'civitai' | 'huggingface',
+                true // Force refresh
+            );
+            
+            // Check if we got valid metadata for the requested provider
+            if (metadata.provider === targetProvider) {
+                console.log(`✅ Successfully found ${targetProvider} metadata for ${path.basename(fullModelPath)}`);
+                return metadata;
+            } else {
+                console.warn(`📣 No metadata found from ${targetProvider} for ${fullModelPath}`);
+                return null;
+            }
+        } catch (error) {
+            const errorMsg = `Failed to search for ${targetProvider} metadata: ${error instanceof Error ? error.message : String(error)}`;
+            console.warn(errorMsg, error);
+            new Notice(errorMsg, 5000);
+            return null;
+        }
     }
 }
