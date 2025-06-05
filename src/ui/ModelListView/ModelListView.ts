@@ -172,11 +172,14 @@ export class ModelListView extends ItemView {
             // Use the recursive function to find all model files
             const scanResult = await findModelsRecursive(modelsPath, modelsPath);
             const modelFiles = scanResult.modelFiles;
-            const directoryInfo = scanResult.directoryInfo;
+            // Note: directoryInfo not needed since we disabled initial note creation
             
             loadingEl.setText(`Found ${modelFiles.length} model files. Processing...`); // Update loading text
 
-            // --- Create Markdown notes for each model file (if setting is enabled) ---
+            // --- DISABLED: Create Markdown notes for each model file (if setting is enabled) ---
+            // This has been disabled to prevent creating notes with empty metadata during folder scan.
+            // Notes are now only created when users click on model names in the UI, using pre-found API metadata.
+            /*
             if (modelNotesFolderPath && modelFiles.length > 0 && this.noteManager) {
                 new Notice(`Creating/checking notes for ${modelFiles.length} models...`, 3000);
                 const noteManager = this.noteManager; // Capture reference
@@ -187,6 +190,7 @@ export class ModelListView extends ItemView {
                 await Promise.all(noteCreationPromises); // Wait for all checks/creations
                 new Notice(`Finished processing model notes.`, 2000);
             }
+            */
             // --- End note creation ---
 
             loadingEl.remove(); // Remove loading message

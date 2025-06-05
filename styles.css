@@ -324,10 +324,80 @@
   padding-left: 10px;
 }
 
-.wb-model-file-icon,
-.wb-model-folder-icon {
-  color: var(--text-muted); /* Dim the icons slightly */
+/* New table-like layout for model rows */
+.wb-model-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
+
+.wb-model-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.wb-model-left {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+}
+
+.wb-model-filename-link {
+  color: var(--text-normal);
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-model-filename-link:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.wb-model-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.wb-model-website-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.wb-model-website-link:hover {
+  color: var(--text-accent);
+}
+
+.wb-provider-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.wb-model-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.wb-stat-item {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Legacy styles for backward compatibility */
 
 /* ===========================================================================
    5. CivitAI Integration Styles

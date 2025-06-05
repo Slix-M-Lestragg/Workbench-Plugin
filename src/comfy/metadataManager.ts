@@ -33,7 +33,7 @@ export class ModelMetadataManager {
         this.loadMetadataCache();
     }
 
-    async enrichModelMetadata(filePath: string): Promise<EnhancedModelMetadata> {
+    async enrichModelMetadata(filePath: string, forceRefresh = false): Promise<EnhancedModelMetadata> {
         const filename = path.basename(filePath);
         
         // Only process actual model files
@@ -43,9 +43,16 @@ export class ModelMetadataManager {
         
         const existingMetadata = this.metadataCache.get(filePath);
 
-        // If we have recent metadata, return it
-        if (existingMetadata && this.isMetadataFresh(existingMetadata)) {
+        // If we have recent metadata and not forcing refresh, return it
+        if (!forceRefresh && existingMetadata && this.isMetadataFresh(existingMetadata)) {
+            console.log(`📋 MetadataManager: Returning cached metadata for "${filename}" (provider: ${existingMetadata.provider})`);
             return existingMetadata;
+        } else if (existingMetadata && forceRefresh) {
+            console.log(`📋 MetadataManager: Force refresh requested for "${filename}", ignoring cache...`);
+        } else if (existingMetadata) {
+            console.log(`📋 MetadataManager: Cached metadata for "${filename}" is stale, refreshing...`);
+        } else {
+            console.log(`📋 MetadataManager: No cached metadata for "${filename}", starting fresh enrichment...`);
         }
 
         const metadata: EnhancedModelMetadata = {
@@ -62,29 +69,31 @@ export class ModelMetadataManager {
         };
 
         try {
+            console.log(`📋 MetadataManager: Calculating file hash for "${filename}"...`);
             // Calculate file hash
             metadata.hash = await FileHashCalculator.calculateSHA256(filePath);
+            console.log(`📋 MetadataManager: File hash calculated: ${metadata.hash}`);
 
-            // Detect provider from file path
-            const detectedProvider = this.detectProviderFromPath(filePath);
+            // Always try HuggingFace API search first, regardless of path detection
+            console.log(`📋 MetadataManager: Starting API enrichment sequence for "${filename}"`);
+            await this.enrichWithHuggingFace(metadata, filename);
             
-            // Try HuggingFace first if detected
-            if (detectedProvider === 'huggingface') {
-                await this.enrichWithHuggingFace(metadata, filename);
-            }
-            
-            // If not HuggingFace or HuggingFace search failed, try CivitAI
+            // If HuggingFace search didn't find a match, try CivitAI
             if (metadata.provider === 'unknown') {
+                console.log(`📋 MetadataManager: HuggingFace search failed, trying CivitAI...`);
                 await this.enrichWithCivitAI(metadata, filename);
+            } else {
+                console.log(`📋 MetadataManager: HuggingFace search successful, skipping CivitAI`);
             }
 
             // Cache the metadata
+            console.log(`📋 MetadataManager: Caching enriched metadata for "${filename}" (final provider: ${metadata.provider})`);
             this.metadataCache.set(filePath, metadata);
             await this.saveMetadataCache();
 
             return metadata;
         } catch (error) {
-            console.error(`Failed to enrich metadata for ${filePath}:`, error);
+            console.error(`📋 MetadataManager: Failed to enrich metadata for ${filePath}:`, error);
             return metadata;
         }
     }
@@ -525,17 +534,25 @@ export class ModelMetadataManager {
     private async enrichWithHuggingFace(metadata: EnhancedModelMetadata, filename: string): Promise<void> {
         try {
             const cleanName = this.extractModelName(filename);
+            console.log(`🤗 MetadataManager: Starting HuggingFace enrichment for "${filename}" -> cleaned name: "${cleanName}"`);
             
             // Try advanced search first
+            console.log(`🤗 MetadataManager: Attempting advanced search...`);
             let huggingfaceModels = await this.huggingfaceService.searchModelsAdvanced(cleanName);
+            console.log(`🤗 MetadataManager: Advanced search returned ${huggingfaceModels.length} models`);
             
             // If no results, try basic search
             if (huggingfaceModels.length === 0) {
+                console.log(`🤗 MetadataManager: Attempting basic search...`);
                 huggingfaceModels = await this.huggingfaceService.searchModelsByName(cleanName);
+                console.log(`🤗 MetadataManager: Basic search returned ${huggingfaceModels.length} models`);
             }
             
             if (huggingfaceModels.length > 0) {
+                console.log(`🤗 MetadataManager: Found ${huggingfaceModels.length} HuggingFace models, selecting best match...`);
                 const bestMatch = this.findBestHuggingFaceMatch(huggingfaceModels, filename);
+                console.log(`🤗 MetadataManager: Best match selected: ${bestMatch.id}`);
+                
                 metadata.huggingfaceModel = bestMatch;
                 metadata.provider = 'huggingface';
                 metadata.isVerified = true;
@@ -546,9 +563,13 @@ export class ModelMetadataManager {
                     compatibleModels: [],
                     baseModel: bestMatch.pipeline_tag || bestMatch.library_name || 'Unknown'
                 };
+                
+                console.log(`🤗 MetadataManager: Successfully enriched metadata with HuggingFace model: ${bestMatch.id}`);
+            } else {
+                console.log(`🤗 MetadataManager: No HuggingFace models found for "${cleanName}"`);
             }
         } catch (error) {
-            console.error('Failed to enrich with HuggingFace:', error);
+            console.error('🤗 MetadataManager: Failed to enrich with HuggingFace:', error);
         }
     }
 
@@ -557,35 +578,52 @@ export class ModelMetadataManager {
      */
     private async enrichWithCivitAI(metadata: EnhancedModelMetadata, filename: string): Promise<void> {
         try {
+            console.log(`🎨 MetadataManager: Starting CivitAI enrichment for "${filename}"`);
+            
             // Search CivitAI by hash first (most accurate)
             let civitaiModels: CivitAIModel[] = [];
             if (metadata.hash) {
+                console.log(`🎨 MetadataManager: Attempting hash search with: ${metadata.hash}`);
                 civitaiModels = await this.civitaiService.searchModelsByHash(metadata.hash);
+                console.log(`🎨 MetadataManager: Hash search returned ${civitaiModels.length} models`);
             }
 
             // If no hash match, try name search
             if (civitaiModels.length === 0) {
                 const cleanName = this.extractModelName(filename);
+                console.log(`🎨 MetadataManager: Attempting name search with: "${cleanName}"`);
                 civitaiModels = await this.civitaiService.searchModelsByName(cleanName);
+                console.log(`🎨 MetadataManager: Name search returned ${civitaiModels.length} models`);
             }
 
             if (civitaiModels.length > 0) {
+                console.log(`🎨 MetadataManager: Found ${civitaiModels.length} CivitAI models, selecting best match...`);
                 const bestMatch = this.findBestMatch(civitaiModels, filename);
+                console.log(`🎨 MetadataManager: Best match selected: ${bestMatch.name} (ID: ${bestMatch.id})`);
+                
                 metadata.civitaiModel = bestMatch;
                 metadata.provider = 'civitai';
 
                 // Find the matching version
                 const matchingVersion = this.findMatchingVersion(bestMatch, filename, metadata.hash);
                 if (matchingVersion) {
+                    console.log(`🎨 MetadataManager: Found matching version: ${matchingVersion.name}`);
                     metadata.civitaiVersion = matchingVersion;
                     metadata.isVerified = true;
+                } else {
+                    console.log(`🎨 MetadataManager: No specific version match found, using default`);
                 }
 
                 // Build relationships
+                console.log(`🎨 MetadataManager: Building relationships...`);
                 metadata.relationships = await this.buildRelationships(bestMatch);
+                
+                console.log(`🎨 MetadataManager: Successfully enriched metadata with CivitAI model: ${bestMatch.name}`);
+            } else {
+                console.log(`🎨 MetadataManager: No CivitAI models found for "${filename}"`);
             }
         } catch (error) {
-            console.error('Failed to enrich with CivitAI:', error);
+            console.error('🎨 MetadataManager: Failed to enrich with CivitAI:', error);
         }
     }
 }

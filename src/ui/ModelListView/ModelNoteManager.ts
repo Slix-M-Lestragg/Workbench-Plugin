@@ -341,6 +341,264 @@ model_type: "${modelType}"`;
     }
 
     /**
+     * Creates a Markdown note for a given model file using pre-found metadata.
+     * This method uses metadata that was already discovered during UI rendering to ensure consistency.
+     * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
+     * @param modelsBasePath Absolute path to the root ComfyUI 'models' directory.
+     * @param directoryInfo Information about all files in each directory for enhanced note content.
+     * @param metadata Pre-found metadata to use for the note creation.
+     */
+    async createModelNoteWithMetadata(
+        relativeModelPath: string, 
+        modelsBasePath: string, 
+        directoryInfo: Record<string, string[]>, 
+        metadata: EnhancedModelMetadata | null
+    ): Promise<void> {
+        console.log(`📝 ModelNoteManager: Creating note for ${relativeModelPath} with metadata:`, metadata);
+        console.log(`📝 ModelNoteManager: Provider: ${metadata?.provider}, CivitAI: ${!!metadata?.civitaiModel}, HF: ${!!metadata?.huggingfaceModel}`);
+        
+        const deviceSettings = this.plugin.getCurrentDeviceSettings();
+        const notesFolder = deviceSettings.modelNotesFolderPath?.trim();
+
+        if (!notesFolder) {
+            return;
+        }
+
+        const noteFileName = path.basename(relativeModelPath, path.extname(relativeModelPath)) + '.md';
+        const noteSubfolderPath = path.dirname(relativeModelPath);
+        const fullNoteFolderPath = path.join(notesFolder, noteSubfolderPath).replace(/\\/g, '/');
+        const fullNotePath = path.join(fullNoteFolderPath, noteFileName).replace(/\\/g, '/');
+        const sourceModelFullPath = path.join(modelsBasePath, relativeModelPath);
+
+        try {
+            const noteExists = await this.plugin.app.vault.adapter.exists(fullNotePath);
+
+            if (!noteExists) {
+                const folderExists = await this.plugin.app.vault.adapter.exists(fullNoteFolderPath);
+                if (!folderExists) {
+                    await this.plugin.app.vault.adapter.mkdir(fullNoteFolderPath);
+                    console.log(`Created model note directory: ${fullNoteFolderPath}`);
+                }
+
+                let noteContent = '';
+                const fileExtension = path.extname(relativeModelPath).toLowerCase();
+
+                if (fileExtension === '.md') {
+                    // --- Handle Markdown Files ---
+                    try {
+                        noteContent = await fs.promises.readFile(sourceModelFullPath, 'utf-8');
+                        console.log(`Copying content from source Markdown: ${relativeModelPath}`);
+                    } catch (readError) {
+                        console.error(`Error reading source Markdown file ${sourceModelFullPath}:`, readError);
+                        new Notice(`Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
+                        noteContent = await this.generateFrontmatterWithMetadata(relativeModelPath, directoryInfo, metadata);
+                    }
+                    // --- End Markdown Handling ---
+
+                } else if (fileExtension === '.json') {
+                    // --- Handle JSON Files ---
+                    // Create a code block that references the source JSON path.
+                    // You'll need a Markdown code block processor in main.ts to handle this.
+                    const relativeSourcePathForLink = path.join(deviceSettings.comfyUiPath || '', 'models', relativeModelPath).replace(/\\/g, '/');
+                    noteContent = `\`\`\`workbench-json\n${relativeSourcePathForLink}\n\`\`\`\n`;
+                    console.log(`Creating JSON view reference note for: ${relativeModelPath}`);
+                    // --- End JSON Handling ---
+
+                } else {
+                    // --- Handle Other File Types (Default Frontmatter) ---
+                    noteContent = await this.generateFrontmatterWithMetadata(relativeModelPath, directoryInfo, metadata);
+                    // --- End Default Handling ---
+                }
+
+                await this.plugin.app.vault.create(fullNotePath, noteContent);
+                console.log(`Created model note with pre-found metadata: ${fullNotePath}`);
+            }
+        } catch (error) {
+            console.error(`Error creating model note for ${relativeModelPath} at ${fullNotePath}:`, error);
+            new Notice(`Error creating note for ${path.basename(relativeModelPath)}. Check console.`);
+        }
+    }
+
+    /**
+     * Generates frontmatter content using pre-found metadata.
+     * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
+     * @param directoryInfo Information about all files in each directory.
+     * @param metadata Pre-found enhanced metadata.
+     * @returns A string containing the note content with frontmatter.
+     */
+    async generateFrontmatterWithMetadata(
+        relativeModelPath: string, 
+        directoryInfo: Record<string, string[]>, 
+        metadata: EnhancedModelMetadata | null
+    ): Promise<string> {
+        console.log(`📝 generateFrontmatterWithMetadata: Processing ${relativeModelPath} with metadata:`, metadata);
+        console.log(`📝 generateFrontmatterWithMetadata: Provider: ${metadata?.provider}, CivitAI: ${!!metadata?.civitaiModel}, HF: ${!!metadata?.huggingfaceModel}`);
+        
+        const modelFilename = path.basename(relativeModelPath);
+        const modelDirectory = path.dirname(relativeModelPath);
+        const modelType = this.inferModelType(relativeModelPath);
+        
+        // Get related files in the same directory
+        const relatedFiles = directoryInfo?.[modelDirectory] || [];
+        const otherFiles = relatedFiles.filter(file => file !== modelFilename && !isModelFile(file));
+        
+        // Start building frontmatter with basic information
+        let frontmatter = `---
+# Model Information (Workbench Generated)
+model_path: "${relativeModelPath.replace(/\\/g, '/')}"
+model_filename: "${modelFilename}"
+model_type: "${modelType}"`;
+
+        // Add enhanced metadata if available
+        if (metadata) {
+            // CivitAI model information
+            if (metadata.civitaiModel) {
+                const model = metadata.civitaiModel;
+                frontmatter += `\ncivitai_model_id: ${model.id}`;
+                frontmatter += `\ncivitai_model_name: "${model.name}"`;
+                if (model.description) {
+                    const cleanDescription = model.description.replace(/"/g, '\\"').replace(/\n/g, ' ').substring(0, 200);
+                    frontmatter += `\ncivitai_description: "${cleanDescription}${model.description.length > 200 ? '...' : ''}"`;
+                }
+                if (model.type) frontmatter += `\ncivitai_type: "${model.type}"`;
+                if (model.nsfw !== undefined) frontmatter += `\ncivitai_nsfw: ${model.nsfw}`;
+                if (model.tags && model.tags.length > 0) {
+                    const tags = model.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
+                    frontmatter += `\ncivitai_tags: [${tags}]`;
+                }
+                if (model.creator?.username) frontmatter += `\ncivitai_creator: "${model.creator.username}"`;
+            }
+
+            // CivitAI version information
+            if (metadata.civitaiVersion) {
+                const version = metadata.civitaiVersion;
+                frontmatter += `\ncivitai_version_id: ${version.id}`;
+                frontmatter += `\ncivitai_version_name: "${version.name}"`;
+                if (version.baseModel) frontmatter += `\nbase_model: "${version.baseModel}"`;
+                if (version.trainedWords && version.trainedWords.length > 0) {
+                    const trainedWords = version.trainedWords.slice(0, 10).map((word: string) => `"${word}"`).join(', ');
+                    frontmatter += `\ntrained_words: [${trainedWords}]`;
+                }
+            }
+
+            // HuggingFace model information
+            if (metadata.huggingfaceModel) {
+                const hfModel = metadata.huggingfaceModel;
+                frontmatter += `\nhuggingface_model_id: "${hfModel.id}"`;
+                frontmatter += `\nhuggingface_author: "${hfModel.author}"`;
+                if (hfModel.downloads) frontmatter += `\nhuggingface_downloads: ${hfModel.downloads}`;
+                if (hfModel.likes) frontmatter += `\nhuggingface_likes: ${hfModel.likes}`;
+                if (hfModel.pipeline_tag) frontmatter += `\nhuggingface_pipeline: "${hfModel.pipeline_tag}"`;
+                if (hfModel.tags && hfModel.tags.length > 0) {
+                    const hfTags = hfModel.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
+                    frontmatter += `\nhuggingface_tags: [${hfTags}]`;
+                }
+            }
+
+            // Provider and verification status
+            frontmatter += `\nprovider: "${metadata.provider || 'unknown'}"`;
+            if (metadata.isVerified !== undefined) frontmatter += `\nverified: ${metadata.isVerified}`;
+
+            // File information
+            if (metadata.hash) frontmatter += `\nfile_hash: "${metadata.hash}"`;
+            if (metadata.lastSynced) {
+                frontmatter += `\nlast_synced: "${metadata.lastSynced.toISOString()}"`;
+            }
+
+            // Model relationships
+            if (metadata.relationships) {
+                const rel = metadata.relationships;
+                if (rel.parentModelId) frontmatter += `\nparent_model_id: ${rel.parentModelId}`;
+                if (rel.childModels && rel.childModels.length > 0) {
+                    const children = rel.childModels.slice(0, 5).map(childId => `${childId}`).join(', ');
+                    frontmatter += `\nchild_models: [${children}]`;
+                }
+                if (rel.compatibleModels && rel.compatibleModels.length > 0) {
+                    frontmatter += `\ncompatible_models_count: ${rel.compatibleModels.length}`;
+                }
+                if (rel.baseModel) frontmatter += `\nrelationship_base_model: "${rel.baseModel}"`;
+                if (rel.derivedFrom) frontmatter += `\nderived_from: "${rel.derivedFrom}"`;
+            }
+        }
+
+        frontmatter += `\n---\n\n`;
+
+        // Add content sections
+        let content = `# ${modelFilename}\n\n`;
+        
+        // Add description from metadata if available
+        if (metadata?.civitaiModel?.description) {
+            content += `## Description\n\n${metadata.civitaiModel.description}\n\n`;
+        } else if (metadata?.huggingfaceModel?.id) {
+            content += `## About This Model\n\nThis model is available on HuggingFace: [${metadata.huggingfaceModel.id}](https://huggingface.co/${metadata.huggingfaceModel.id})\n\n`;
+        }
+
+        // Add model information section
+        content += `## Model Information\n\n`;
+        content += `- **Type**: ${modelType}\n`;
+        content += `- **Path**: \`${relativeModelPath}\`\n`;
+        
+        if (metadata) {
+            if (metadata.provider && metadata.provider !== 'unknown') {
+                content += `- **Provider**: ${metadata.provider}\n`;
+            }
+            if (metadata.civitaiModel) {
+                content += `- **CivitAI Model**: [${metadata.civitaiModel.name}](https://civitai.com/models/${metadata.civitaiModel.id})\n`;
+                if (metadata.civitaiModel.creator?.username) {
+                    content += `- **Creator**: ${metadata.civitaiModel.creator.username}\n`;
+                }
+            }
+            if (metadata.huggingfaceModel) {
+                content += `- **HuggingFace Model**: [${metadata.huggingfaceModel.id}](https://huggingface.co/${metadata.huggingfaceModel.id})\n`;
+                content += `- **Author**: ${metadata.huggingfaceModel.author}\n`;
+                if (metadata.huggingfaceModel.downloads) {
+                    content += `- **Downloads**: ${metadata.huggingfaceModel.downloads.toLocaleString()}\n`;
+                }
+                if (metadata.huggingfaceModel.likes) {
+                    content += `- **Likes**: ${metadata.huggingfaceModel.likes.toLocaleString()}\n`;
+                }
+            }
+        }
+
+        // Add tags if available
+        const allTags = new Set<string>();
+        if (metadata?.civitaiModel?.tags) {
+            metadata.civitaiModel.tags.forEach(tag => allTags.add(tag));
+        }
+        if (metadata?.huggingfaceModel?.tags) {
+            metadata.huggingfaceModel.tags.forEach(tag => allTags.add(tag));
+        }
+        
+        if (allTags.size > 0) {
+            content += `\n## Tags\n\n`;
+            Array.from(allTags).slice(0, 20).forEach(tag => {
+                content += `- ${tag}\n`;
+            });
+        }
+
+        // Add trained words if available
+        if (metadata?.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
+            content += `\n## Trained Words\n\n`;
+            metadata.civitaiVersion.trainedWords.forEach(word => {
+                content += `- \`${word}\`\n`;
+            });
+        }
+
+        // Add related files section
+        if (otherFiles.length > 0) {
+            content += `\n## Related Files\n\n`;
+            otherFiles.forEach(file => {
+                content += `- \`${file}\`\n`;
+            });
+        }
+
+        // Add usage notes section
+        content += `\n## Usage Notes\n\n*Add your notes about using this model here.*\n\n`;
+
+        return frontmatter + content;
+    }
+
+    /**
      * Infers the model type based on the file path and extension.
      * @param relativeModelPath Path of the model file relative to the ComfyUI 'models' directory.
      * @returns A string indicating the inferred model type.
@@ -445,8 +703,24 @@ model_type: "${modelType}"`;
      * @returns The provider type: 'civitai', 'huggingface', or 'unknown'
      */
     private detectModelProviderFromPath(fullRelativePath: string): 'civitai' | 'huggingface' | 'unknown' {
-        // For now, return 'unknown' as the default. In the future, this could include
-        // more sophisticated path-based detection logic
+        const pathLower = fullRelativePath.toLowerCase();
+        
+        // HuggingFace patterns
+        if (pathLower.includes('huggingface') || 
+            pathLower.includes('hf-hub') ||
+            pathLower.includes('transformers') ||
+            pathLower.match(/.*\/.*--.*\/.*/) || // HF cache pattern: author--model/version
+            pathLower.includes('diffusers')) {
+            return 'huggingface';
+        }
+        
+        // CivitAI patterns (often have hash-based names or specific folders)
+        if (pathLower.includes('civitai') ||
+            pathLower.match(/^[a-f0-9]{8,}\./) || // Hash-based filenames
+            pathLower.includes('lora') && pathLower.match(/\d+\.safetensors$/)) {
+            return 'civitai';
+        }
+        
         return 'unknown';
     }
 }

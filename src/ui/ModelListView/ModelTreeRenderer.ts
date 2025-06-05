@@ -2,7 +2,8 @@ import { setIcon } from 'obsidian';
 import * as path from 'path';
 import type Workbench from '../../main';
 import { ModelMetadataManager } from '../../comfy/metadataManager';
-import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME, UNKNOWN_PROVIDER_ICON_NAME } from '../icons';
+import { EnhancedModelMetadata } from '../../comfy/types';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../icons';
 import { ModelNoteManager } from './ModelNoteManager';
 
 // --- Type definition for the nested tree structure ---
@@ -53,12 +54,50 @@ export class ModelTreeRenderer {
                 await Promise.all(filePaths.map(async (fullRelativePath) => {
                     const fileName = path.basename(fullRelativePath); // Extract filename for display
                     const fileItemEl = fileListEl.createEl('li', { cls: 'wb-model-file-item' });
+
+                    // --- API Search: HuggingFace first, then CivitAI ---
+                    // Always attempt HuggingFace API search first, regardless of path-based detection
+                    console.log(`🔍 Starting API search for model: ${fileName}`);
+                    console.log(`📁 Full path: ${fullRelativePath}`);
                     
-                    // Enhance with CivitAI metadata if enabled
-                    if (this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
-                        await this.enhanceFileItemWithCivitAI(fileItemEl, fullRelativePath, fileName, notesFolder);
-                    } else {
-                        await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+                    let foundMetadata: EnhancedModelMetadata | null = null;
+                    let found = false;
+                    
+                    // Try HuggingFace API search first
+                    if (this.metadataManager) {
+                        console.log(`🤗 Attempting HuggingFace search for: ${fileName}`);
+                        const startTime = Date.now();
+                        const result = await this.searchForMetadata(fullRelativePath, 'huggingface');
+                        const duration = Date.now() - startTime;
+                        if (result) {
+                            foundMetadata = result;
+                            found = true;
+                            console.log(`🤗 HuggingFace search completed in ${duration}ms. Found: ${found}`);
+                        } else {
+                            console.log(`🤗 HuggingFace search completed in ${duration}ms. Found: ${found}`);
+                        }
+                    }
+                    
+                    // If no HuggingFace match found, try CivitAI API search
+                    if (!found && this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
+                        console.log(`🎨 Attempting CivitAI search for: ${fileName}`);
+                        const startTime = Date.now();
+                        const result = await this.searchForMetadata(fullRelativePath, 'civitai');
+                        const duration = Date.now() - startTime;
+                        if (result) {
+                            foundMetadata = result;
+                            found = true;
+                            console.log(`🎨 CivitAI search completed in ${duration}ms. Found: ${found}`);
+                        } else {
+                            console.log(`🎨 CivitAI search completed in ${duration}ms. Found: ${found}`);
+                        }
+                    }
+                    
+                    // Now render the file item with whatever metadata we found (or null)
+                    await this.renderFileItemWithMetadata(fileItemEl, fullRelativePath, fileName, notesFolder, foundMetadata);
+                    
+                    if (!found) {
+                        console.log(`❌ No metadata found for: ${fileName}`);
                     }
                 }));
                  // Ensure the file list is directly under the parent (which should be details or root)
@@ -87,128 +126,155 @@ export class ModelTreeRenderer {
     }
 
     /**
-     * Renders a basic file item without enhanced metadata
+     * Renders a file item with the provided metadata (or without if null)
      */
-    private async renderBasicFileItem(
+    private async renderFileItemWithMetadata(
         fileItemEl: HTMLElement, 
         fullRelativePath: string, 
         fileName: string, 
-        notesFolder?: string
+        notesFolder?: string,
+        metadata?: EnhancedModelMetadata | null
     ): Promise<void> {
-        const fileNameEl = fileItemEl.createSpan({ cls: 'wb-model-filename' });
-        fileNameEl.textContent = fileName;
+        // Create a flex container for the model row
+        fileItemEl.classList.add('wb-model-row');
         
-        // Add basic file information
-        const fileInfoEl = fileItemEl.createDiv({ cls: 'wb-model-info' });
-        fileInfoEl.createSpan({ 
-            cls: 'wb-model-path', 
-            text: `Path: ${fullRelativePath}` 
+        // Left side: Model name as clickable link
+        const leftSide = fileItemEl.createDiv({ cls: 'wb-model-left' });
+        const fileNameEl = leftSide.createEl('a', { 
+            cls: 'wb-model-filename-link',
+            text: metadata?.civitaiModel?.name || metadata?.huggingfaceModel?.id || fileName,
+            href: '#'
         });
-
-        // Add note link if notes folder is configured
-        if (notesFolder) {
-            const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
-            const noteSubfolderPath = path.dirname(fullRelativePath);
-            const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
-            
-            const noteLinkEl = fileItemEl.createEl('a', {
-                cls: 'wb-model-note-link',
-                text: '📝 Note',
-                href: '#'
-            });
-            
-            noteLinkEl.addEventListener('click', async (e) => {
-                e.preventDefault();
+        
+        // Make the filename clickable to open the file or note
+        fileNameEl.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (notesFolder) {
+                // Open/create note with the metadata from the API search
+                const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
+                const noteSubfolderPath = path.dirname(fullRelativePath);
+                const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
+                
                 try {
-                    // Check if note exists, create if not
                     const noteExists = await this.plugin.app.vault.adapter.exists(fullNotePath);
                     if (!noteExists) {
-                        await this.noteManager.createModelNoteIfNeeded(fullRelativePath, '', {});
+                        // Pass the metadata from the UI search to note creation
+                        console.log(`📝 Creating note for ${fileName} with metadata:`, metadata);
+                        console.log(`📝 Provider: ${metadata?.provider}, CivitAI: ${!!metadata?.civitaiModel}, HF: ${!!metadata?.huggingfaceModel}`);
+                        await this.noteManager.createModelNoteWithMetadata(fullRelativePath, '', {}, metadata || null);
                     }
                     
-                    // Open the note
                     const noteFile = this.plugin.app.vault.getAbstractFileByPath(fullNotePath);
                     if (noteFile) {
                         await this.plugin.app.workspace.openLinkText(fullNotePath, '', false);
                     }
                 } catch (error) {
                     console.error('Error opening model note:', error);
-                    // Assuming Notice is available in the context where this is used
-                    // new Notice('Error opening model note');
                 }
-            });
+            }
+        });
+
+        // Right side: Metadata if available
+        const rightSide = fileItemEl.createDiv({ cls: 'wb-model-right' });
+        
+        if (metadata) {
+            if (metadata.provider === 'civitai' && metadata.civitaiModel) {
+                // Website link with CivitAI icon
+                const websiteLink = rightSide.createEl('a', {
+                    cls: 'wb-model-website-link',
+                    href: `https://civitai.com/models/${metadata.civitaiModel.id}`,
+                    title: 'View on CivitAI'
+                });
+                websiteLink.setAttribute('target', '_blank');
+                const iconEl = websiteLink.createSpan({ cls: 'wb-provider-icon' });
+                setIcon(iconEl, CIVITAI_ICON_NAME);
+                
+                // Stats container
+                const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
+                
+                if (metadata.civitaiModel.stats) {
+                    // Download count
+                    if (metadata.civitaiModel.stats.downloadCount) {
+                        statsContainer.createSpan({ 
+                            cls: 'wb-stat-item',
+                            text: `📥 ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}`
+                        });
+                    }
+                    
+                    // Favorite count
+                    if (metadata.civitaiModel.stats.favoriteCount) {
+                        statsContainer.createSpan({ 
+                            cls: 'wb-stat-item',
+                            text: `👍 ${metadata.civitaiModel.stats.favoriteCount.toLocaleString()}`
+                        });
+                    }
+                    
+                    // Rating
+                    if (metadata.civitaiModel.stats.rating) {
+                        statsContainer.createSpan({ 
+                            cls: 'wb-stat-item',
+                            text: `⭐ ${metadata.civitaiModel.stats.rating.toFixed(1)}`
+                        });
+                    }
+                }
+            } else if (metadata.provider === 'huggingface' && metadata.huggingfaceModel) {
+                // Website link with HuggingFace icon
+                const websiteLink = rightSide.createEl('a', {
+                    cls: 'wb-model-website-link',
+                    href: `https://huggingface.co/${metadata.huggingfaceModel.id}`,
+                    title: 'View on HuggingFace'
+                });
+                websiteLink.setAttribute('target', '_blank');
+                const iconEl = websiteLink.createSpan({ cls: 'wb-provider-icon' });
+                setIcon(iconEl, HUGGINGFACE_ICON_NAME);
+                
+                // Stats container
+                const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
+                
+                // Download count
+                if (metadata.huggingfaceModel.downloads) {
+                    statsContainer.createSpan({ 
+                        cls: 'wb-stat-item',
+                        text: `📥 ${metadata.huggingfaceModel.downloads.toLocaleString()}`
+                    });
+                }
+                
+                // Likes count
+                if (metadata.huggingfaceModel.likes) {
+                    statsContainer.createSpan({ 
+                        cls: 'wb-stat-item',
+                        text: `👍 ${metadata.huggingfaceModel.likes.toLocaleString()}`
+                    });
+                }
+            }
         }
     }
 
     /**
-     * Enhances a file item with CivitAI metadata
+     * Searches for metadata without rendering UI elements
+     * Returns the metadata if found, null otherwise
      */
-    private async enhanceFileItemWithCivitAI(
-        fileItemEl: HTMLElement, 
+    private async searchForMetadata(
         fullRelativePath: string, 
-        fileName: string, 
-        notesFolder?: string
-    ): Promise<void> {
-        // Start with basic rendering
-        await this.renderBasicFileItem(fileItemEl, fullRelativePath, fileName, notesFolder);
+        provider: 'huggingface' | 'civitai'
+    ): Promise<EnhancedModelMetadata | null> {
+        if (!this.metadataManager) return null;
         
-        if (!this.metadataManager) {
-            return;
-        }
-
         try {
-            // Try to get enhanced metadata
-            const metadata = await this.metadataManager.enrichModelMetadata(fullRelativePath);
+            // Force a fresh metadata search by passing forceRefresh = true
+            const metadata = await this.metadataManager.enrichModelMetadata(fullRelativePath, true);
             
-            if (metadata) {
-                const enhancedInfoEl = fileItemEl.createDiv({ cls: 'wb-enhanced-info' });
-                
-                // Add provider icon
-                const providerIconEl = enhancedInfoEl.createSpan({ cls: 'wb-provider-icon' });
-                if (metadata.provider === 'civitai') {
-                    setIcon(providerIconEl, CIVITAI_ICON_NAME);
-                } else if (metadata.provider === 'huggingface') {
-                    setIcon(providerIconEl, HUGGINGFACE_ICON_NAME);
-                } else {
-                    setIcon(providerIconEl, UNKNOWN_PROVIDER_ICON_NAME);
-                }
-                
-                // Add model information based on provider
-                if (metadata.civitaiModel) {
-                    enhancedInfoEl.createSpan({ 
-                        cls: 'wb-model-name',
-                        text: metadata.civitaiModel.name 
-                    });
-                    
-                    if (metadata.civitaiModel.stats) {
-                        const statsEl = enhancedInfoEl.createDiv({ cls: 'wb-model-stats' });
-                        statsEl.createSpan({ 
-                            text: `⭐ ${metadata.civitaiModel.stats.rating?.toFixed(1) || 'N/A'}` 
-                        });
-                        statsEl.createSpan({ 
-                            text: `👍 ${metadata.civitaiModel.stats.favoriteCount || 0}` 
-                        });
-                        statsEl.createSpan({ 
-                            text: `📥 ${metadata.civitaiModel.stats.downloadCount || 0}` 
-                        });
-                    }
-                } else if (metadata.huggingfaceModel) {
-                    enhancedInfoEl.createSpan({ 
-                        cls: 'wb-model-name',
-                        text: metadata.huggingfaceModel.id 
-                    });
-                    
-                    const statsEl = enhancedInfoEl.createDiv({ cls: 'wb-model-stats' });
-                    statsEl.createSpan({ 
-                        text: `👍 ${metadata.huggingfaceModel.likes || 0}` 
-                    });
-                    statsEl.createSpan({ 
-                        text: `📥 ${metadata.huggingfaceModel.downloads || 0}` 
-                    });
+            if (metadata && metadata.provider === provider) {
+                if (provider === 'huggingface' && metadata.huggingfaceModel) {
+                    return metadata;
+                } else if (provider === 'civitai' && metadata.civitaiModel) {
+                    return metadata;
                 }
             }
         } catch (error) {
-            console.warn('Failed to enhance file item with metadata:', error);
+            console.warn(`Failed to search for ${provider} metadata:`, error);
         }
+        
+        return null;
     }
 }
