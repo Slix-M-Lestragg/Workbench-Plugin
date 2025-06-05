@@ -28,7 +28,7 @@ export class ModelTreeRenderer {
     /**
      * Recursive function to render the tree
      */
-    async renderModelTree(node: ModelTreeNode, parentEl: HTMLElement): Promise<void> {
+    async renderModelTree(node: ModelTreeNode, parentEl: HTMLElement, isRefresh = false): Promise<void> {
         const deviceSettings = this.plugin.getCurrentDeviceSettings();
         const notesFolder = deviceSettings.modelNotesFolderPath?.trim();
 
@@ -55,16 +55,24 @@ export class ModelTreeRenderer {
                     const fileName = path.basename(fullRelativePath); // Extract filename for display
                     const fileItemEl = fileListEl.createEl('li', { cls: 'wb-model-file-item' });
 
+                    // Check if note already exists (to optimize API calls)
+                    const noteAlreadyExists = await this.noteExists(fullRelativePath, notesFolder);
+                    const shouldSkipApiSearch = !isRefresh && noteAlreadyExists;
+
+                    if (shouldSkipApiSearch) {
+                        console.log(`⏭️ Skipping API search for ${fileName} - note already exists (use refresh to force update)`);
+                    }
+
                     // --- API Search: HuggingFace first, then CivitAI ---
-                    // Always attempt HuggingFace API search first, regardless of path-based detection
-                    console.log(`🔍 Starting API search for model: ${fileName}`);
+                    // Only perform API search if note doesn't exist OR this is a refresh operation
+                    console.log(`🔍 Starting API search for model: ${fileName} (refresh: ${isRefresh}, noteExists: ${noteAlreadyExists})`);
                     console.log(`📁 Full path: ${fullRelativePath}`);
                     
                     let foundMetadata: EnhancedModelMetadata | null = null;
                     let found = false;
                     
-                    // Try HuggingFace API search first
-                    if (this.metadataManager) {
+                    // Try HuggingFace API search first (only if we should search)
+                    if (!shouldSkipApiSearch && this.metadataManager) {
                         console.log(`🤗 Attempting HuggingFace search for: ${fileName}`);
                         const startTime = Date.now();
                         const result = await this.searchForMetadata(fullRelativePath, 'huggingface');
@@ -78,8 +86,8 @@ export class ModelTreeRenderer {
                         }
                     }
                     
-                    // If no HuggingFace match found, try CivitAI API search
-                    if (!found && this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
+                    // If no HuggingFace match found, try CivitAI API search (only if we should search)
+                    if (!found && !shouldSkipApiSearch && this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
                         console.log(`🎨 Attempting CivitAI search for: ${fileName}`);
                         const startTime = Date.now();
                         const result = await this.searchForMetadata(fullRelativePath, 'civitai');
@@ -93,10 +101,28 @@ export class ModelTreeRenderer {
                         }
                     }
                     
+                    // Automatically create note if metadata was found and note doesn't exist
+                    if (found && foundMetadata && notesFolder) {
+                        const noteAlreadyExistsAfterSearch = await this.noteExists(fullRelativePath, notesFolder);
+                        if (!noteAlreadyExistsAfterSearch) {
+                            try {
+                                console.log(`🚀 Auto-creating note for ${fileName} with metadata from ${foundMetadata.provider}`);
+                                await this.noteManager.createModelNoteWithMetadata(fullRelativePath, '', {}, foundMetadata);
+                                console.log(`✅ Successfully auto-created note for ${fileName}`);
+                            } catch (error) {
+                                console.error(`❌ Failed to auto-create note for ${fileName}:`, error);
+                            }
+                        } else {
+                            console.log(`ℹ️ Note already exists for ${fileName}, skipping auto-creation`);
+                        }
+                    }
+                    
                     // Now render the file item with whatever metadata we found (or null)
                     await this.renderFileItemWithMetadata(fileItemEl, fullRelativePath, fileName, notesFolder, foundMetadata);
                     
-                    if (!found) {
+                    if (shouldSkipApiSearch) {
+                        console.log(`⏭️ Skipped API search for: ${fileName} (note exists, not a refresh)`);
+                    } else if (!found) {
                         console.log(`❌ No metadata found for: ${fileName}`);
                     }
                 }));
@@ -120,7 +146,7 @@ export class ModelTreeRenderer {
                 summaryEl.createSpan({ text: key }); // Folder name
 
                 // Recursively render the content of the subfolder
-                await this.renderModelTree(subNode, detailsEl);
+                await this.renderModelTree(subNode, detailsEl, isRefresh);
             }
         }
     }
@@ -150,7 +176,7 @@ export class ModelTreeRenderer {
         fileNameEl.addEventListener('click', async (e) => {
             e.preventDefault();
             if (notesFolder) {
-                // Open/create note with the metadata from the API search
+                // Open existing note or create if it doesn't exist (fallback for edge cases)
                 const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
                 const noteSubfolderPath = path.dirname(fullRelativePath);
                 const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
@@ -158,9 +184,8 @@ export class ModelTreeRenderer {
                 try {
                     const noteExists = await this.plugin.app.vault.adapter.exists(fullNotePath);
                     if (!noteExists) {
-                        // Pass the metadata from the UI search to note creation
-                        console.log(`📝 Creating note for ${fileName} with metadata:`, metadata);
-                        console.log(`📝 Provider: ${metadata?.provider}, CivitAI: ${!!metadata?.civitaiModel}, HF: ${!!metadata?.huggingfaceModel}`);
+                        // Fallback: create note without metadata if it somehow doesn't exist
+                        console.log(`📝 Fallback: Creating note for ${fileName} (note should have been auto-created)`);
                         await this.noteManager.createModelNoteWithMetadata(fullRelativePath, '', {}, metadata || null);
                     }
                     
@@ -276,5 +301,23 @@ export class ModelTreeRenderer {
         }
         
         return null;
+    }
+
+    /**
+     * Checks if a note already exists for the given model path
+     */
+    private async noteExists(fullRelativePath: string, notesFolder?: string): Promise<boolean> {
+        if (!notesFolder) return false;
+        
+        try {
+            const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
+            const noteSubfolderPath = path.dirname(fullRelativePath);
+            const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
+            
+            return await this.plugin.app.vault.adapter.exists(fullNotePath);
+        } catch (error) {
+            console.warn('Error checking if note exists:', error);
+            return false;
+        }
     }
 }

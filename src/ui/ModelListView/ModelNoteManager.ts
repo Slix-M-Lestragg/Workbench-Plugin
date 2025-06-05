@@ -6,20 +6,6 @@ import { ModelMetadataManager } from '../../comfy/metadataManager';
 import { EnhancedModelMetadata } from '../../comfy/types';
 
 /**
- * Determines if a file is a model file based on its extension.
- * @param filename The filename to check.
- * @returns True if the file is considered a model file.
- */
-function isModelFile(filename: string): boolean {
-    const extension = path.extname(filename).toLowerCase();
-    const modelExtensions = [
-        '.safetensors', '.ckpt', '.pth', '.pt', '.gguf', '.model',
-        '.bin', '.h5', '.onnx', '.tflite', '.pb', '.trt'
-    ];
-    return modelExtensions.includes(extension);
-}
-
-/**
  * Handles the creation and management of model notes
  */
 export class ModelNoteManager {
@@ -111,12 +97,7 @@ export class ModelNoteManager {
      */
     async generateDefaultFrontmatter(relativeModelPath: string, directoryInfo?: Record<string, string[]>): Promise<string> {
         const modelFilename = path.basename(relativeModelPath);
-        const modelDirectory = path.dirname(relativeModelPath);
         const modelType = this.inferModelType(relativeModelPath);
-        
-        // Get related files in the same directory
-        const relatedFiles = directoryInfo?.[modelDirectory] || [];
-        const otherFiles = relatedFiles.filter(file => file !== modelFilename && !isModelFile(file));
         
         // Try to get enhanced metadata
         let enhancedMetadata: EnhancedModelMetadata | null = null;
@@ -133,211 +114,122 @@ export class ModelNoteManager {
             }
         }
 
-        // Start building frontmatter with basic information
-        let frontmatter = `---
-# Model Information (Workbench Generated)
-model_path: "${relativeModelPath.replace(/\\/g, '/')}"
-model_filename: "${modelFilename}"
-model_type: "${modelType}"`;
-
-        // Add enhanced metadata if available
-        if (enhancedMetadata) {
-            // CivitAI model information
-            if (enhancedMetadata.civitaiModel) {
-                const model = enhancedMetadata.civitaiModel;
-                frontmatter += `\ncivitai_model_id: ${model.id}`;
-                frontmatter += `\ncivitai_model_name: "${model.name}"`;
-                if (model.description) {
-                    // Clean description for YAML (escape quotes and newlines)
-                    const cleanDescription = model.description.replace(/"/g, '\\"').replace(/\n/g, ' ').substring(0, 200);
-                    frontmatter += `\ncivitai_description: "${cleanDescription}${model.description.length > 200 ? '...' : ''}"`;
+        // Build tags array (excluding license and region tags) and extract license
+        const allTags = new Set<string>();
+        let extractedLicense = '';
+        
+        if (enhancedMetadata?.civitaiModel?.tags) {
+            enhancedMetadata.civitaiModel.tags.forEach(tag => {
+                const tagLower = tag.toLowerCase();
+                if (tagLower.startsWith('license:')) {
+                    extractedLicense = tag.substring(8); // Remove 'license:' prefix
+                } else if (!tagLower.includes('license') && !tagLower.startsWith('region:')) {
+                    allTags.add(tag);
                 }
-                if (model.type) frontmatter += `\ncivitai_type: "${model.type}"`;
-                if (model.nsfw !== undefined) frontmatter += `\ncivitai_nsfw: ${model.nsfw}`;
-                if (model.tags && model.tags.length > 0) {
-                    const tags = model.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
-                    frontmatter += `\ncivitai_tags: [${tags}]`;
-                }
-                if (model.creator?.username) frontmatter += `\ncivitai_creator: "${model.creator.username}"`;
-            }
-
-            // CivitAI version information
-            if (enhancedMetadata.civitaiVersion) {
-                const version = enhancedMetadata.civitaiVersion;
-                frontmatter += `\ncivitai_version_id: ${version.id}`;
-                frontmatter += `\ncivitai_version_name: "${version.name}"`;
-                if (version.baseModel) frontmatter += `\nbase_model: "${version.baseModel}"`;
-                if (version.trainedWords && version.trainedWords.length > 0) {
-                    const trainedWords = version.trainedWords.slice(0, 10).map((word: string) => `"${word}"`).join(', ');
-                    frontmatter += `\ntrained_words: [${trainedWords}]`;
-                }
-            }
-
-            // HuggingFace model information
-            if (enhancedMetadata.huggingfaceModel) {
-                const hfModel = enhancedMetadata.huggingfaceModel;
-                frontmatter += `\nhuggingface_model_id: "${hfModel.id}"`;
-                frontmatter += `\nhuggingface_author: "${hfModel.author}"`;
-                if (hfModel.downloads) frontmatter += `\nhuggingface_downloads: ${hfModel.downloads}`;
-                if (hfModel.likes) frontmatter += `\nhuggingface_likes: ${hfModel.likes}`;
-                if (hfModel.pipeline_tag) frontmatter += `\nhuggingface_pipeline: "${hfModel.pipeline_tag}"`;
-                if (hfModel.tags && hfModel.tags.length > 0) {
-                    const hfTags = hfModel.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
-                    frontmatter += `\nhuggingface_tags: [${hfTags}]`;
-                }
-            }
-
-            // Provider and verification status
-            frontmatter += `\nprovider: "${enhancedMetadata.provider || 'unknown'}"`;
-            if (enhancedMetadata.isVerified !== undefined) frontmatter += `\nverified: ${enhancedMetadata.isVerified}`;
-
-            // File information
-            if (enhancedMetadata.hash) frontmatter += `\nfile_hash: "${enhancedMetadata.hash}"`;
-            if (enhancedMetadata.lastSynced) {
-                frontmatter += `\nlast_synced: "${enhancedMetadata.lastSynced.toISOString()}"`;
-            }
-
-            // Model relationships
-            if (enhancedMetadata.relationships) {
-                const rel = enhancedMetadata.relationships;
-                if (rel.parentModelId) frontmatter += `\nparent_model_id: ${rel.parentModelId}`;
-                if (rel.childModels && rel.childModels.length > 0) {
-                    frontmatter += `\nchild_models_count: ${rel.childModels.length}`;
-                }
-                if (rel.compatibleModels && rel.compatibleModels.length > 0) {
-                    frontmatter += `\ncompatible_models_count: ${rel.compatibleModels.length}`;
-                }
-                if (rel.baseModel) frontmatter += `\nrelationship_base_model: "${rel.baseModel}"`;
-                if (rel.derivedFrom) frontmatter += `\nderived_from: "${rel.derivedFrom}"`;
-            }
-
-            // Enhanced tags including workbench-model and provider
-            const tags = ['workbench-model'];
-            if (enhancedMetadata.provider && enhancedMetadata.provider !== 'unknown') {
-                tags.push(enhancedMetadata.provider);
-            }
-            if (enhancedMetadata.civitaiModel?.type) {
-                tags.push(enhancedMetadata.civitaiModel.type.toLowerCase().replace(/\s+/g, '-'));
-            }
-            if (enhancedMetadata.huggingfaceModel?.pipeline_tag) {
-                tags.push(enhancedMetadata.huggingfaceModel.pipeline_tag.toLowerCase().replace(/\s+/g, '-'));
-            }
-            frontmatter += `\ntags: [${tags.map(tag => `"${tag}"`).join(', ')}]`;
-        } else {
-            // Fallback to basic tags if no enhanced metadata
-            frontmatter += `\ntags: [workbench-model]`;
+            });
         }
+        if (enhancedMetadata?.huggingfaceModel?.tags) {
+            enhancedMetadata.huggingfaceModel.tags.forEach(tag => {
+                const tagLower = tag.toLowerCase();
+                if (tagLower.startsWith('license:')) {
+                    extractedLicense = tag.substring(8); // Remove 'license:' prefix
+                } else if (!tagLower.includes('license') && !tagLower.startsWith('region:')) {
+                    allTags.add(tag);
+                }
+            });
+        }
+        
+        // Build frontmatter in the new format
+        let frontmatter = `---\nprovider:`;
+        
+        // Add provider as array
+        if (enhancedMetadata?.provider && enhancedMetadata.provider !== 'unknown') {
+            frontmatter += `\n  - ${enhancedMetadata.provider}`;
+        } else {
+            frontmatter += `\n  - unknown`;
+        }
+        
+        // Add common fields based on provider
+        if (enhancedMetadata?.huggingfaceModel) {
+            const hfModel = enhancedMetadata.huggingfaceModel;
+            if (hfModel.downloads) frontmatter += `\ndownloads: ${hfModel.downloads}`;
+            if (hfModel.likes) frontmatter += `\nlikes: ${hfModel.likes}`;
+            if (enhancedMetadata.isVerified !== undefined) frontmatter += `\nverified: ${enhancedMetadata.isVerified}`;
+            frontmatter += `\nAuthor: ${hfModel.author}`;
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            if (hfModel.pipeline_tag) {
+                frontmatter += `\npipeline:\n  - ${hfModel.pipeline_tag}`;
+            }
+            if (enhancedMetadata.relationships?.baseModel) {
+                frontmatter += `\nrelationship_base_model: ${enhancedMetadata.relationships.baseModel}`;
+            }
+            frontmatter += `\nmodel_id: ${hfModel.id}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+            frontmatter += `\nsource: https://huggingface.co/${hfModel.id}`;
+        } else if (enhancedMetadata?.civitaiModel) {
+            const model = enhancedMetadata.civitaiModel;
+            if (model.stats?.downloadCount) frontmatter += `\ndownloads: ${model.stats.downloadCount}`;
+            if (model.stats?.favoriteCount) frontmatter += `\nlikes: ${model.stats.favoriteCount}`;
+            if (enhancedMetadata.isVerified !== undefined) frontmatter += `\nverified: ${enhancedMetadata.isVerified}`;
+            if (model.creator?.username) frontmatter += `\nAuthor: ${model.creator.username}`;
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            if (enhancedMetadata.civitaiVersion?.baseModel) {
+                frontmatter += `\nrelationship_base_model: ${enhancedMetadata.civitaiVersion.baseModel}`;
+            }
+            frontmatter += `\nmodel_id: ${model.id}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+            frontmatter += `\nsource: https://civitai.com/models/${model.id}`;
+        } else {
+            // Fallback for unknown provider
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+        }
+        
+        // Add tags
+        if (allTags.size > 0) {
+            frontmatter += `\ntags:`;
+            Array.from(allTags).slice(0, 20).forEach(tag => {
+                frontmatter += `\n  - ${tag}`;
+            });
+        }
+        
+        // Add license if available
+        if (enhancedMetadata?.huggingfaceModel?.card_data?.license) {
+            frontmatter += `\nlicense: ${enhancedMetadata.huggingfaceModel.card_data.license}`;
+        } else if (extractedLicense) {
+            frontmatter += `\nlicense: ${extractedLicense}`;
+        } else if (enhancedMetadata?.civitaiModel?.allowNoCredit !== undefined) {
+            // CivitAI license info - allowNoCredit is a boolean indicating license restrictions
+            const licenseType = enhancedMetadata.civitaiModel.allowNoCredit ? 'permissive' : 'restricted';
+            frontmatter += `\nlicense: ${licenseType}`;
+        }
+        
+        // Add last synced
+        if (enhancedMetadata?.lastSynced) {
+            frontmatter += `\nlast_synced: ${enhancedMetadata.lastSynced.toISOString()}`;
+        }
+        
+        frontmatter += `\n---\n`;
+        
+        // Add content in new format
+        const content = `### Model Information
 
-        frontmatter += `\n---
+| <center>Type</center> | <center>Author</center> | <center>Provider</center> | <center>URL</center> | <center>License</center> | <center>Downloads</center> | Likes           |
+| --------------------- | ----------------------- | ------------------------- | -------------------- | ------------------------ | -------------------------- | --------------- |
+| \`= this.model_type\`   | \`= this.author\`         | \`= this.provider\`         | \`= this.source\`      | \`= this.license\`         | \`= this.downloads\`         |  \`= this.likes\` |
 
-# ${enhancedMetadata?.civitaiModel?.name || enhancedMetadata?.huggingfaceModel?.id || modelFilename}
+**Tags** : \`$= "#" + dv.current().tags.join(" #")\`
+## Usage Notes
+
+*Add your notes about using this model here.*
+
 
 `;
 
-        // Add enhanced description if available
-        if (enhancedMetadata?.civitaiModel?.description) {
-            frontmatter += `## Description\n\n${enhancedMetadata.civitaiModel.description}\n\n`;
-        } else {
-            frontmatter += `Notes about this model...\n\n`;
-        }
-
-        // Add CivitAI model details section
-        if (enhancedMetadata?.civitaiModel) {
-            frontmatter += `## Model Details\n\n`;
-            
-            const model = enhancedMetadata.civitaiModel;
-            if (model.type) frontmatter += `- **Type**: ${model.type}\n`;
-            if (model.creator?.username) frontmatter += `- **Creator**: ${model.creator.username}\n`;
-            if (model.stats) {
-                frontmatter += `- **Downloads**: ${model.stats.downloadCount?.toLocaleString() || 'N/A'}\n`;
-                frontmatter += `- **Rating**: ${model.stats.rating ? model.stats.rating.toFixed(1) : 'N/A'} (${model.stats.ratingCount || 0} reviews)\n`;
-                frontmatter += `- **Favorites**: ${model.stats.favoriteCount?.toLocaleString() || 'N/A'}\n`;
-            }
-
-            if (enhancedMetadata.civitaiVersion) {
-                const version = enhancedMetadata.civitaiVersion;
-                if (version.baseModel) frontmatter += `- **Base Model**: ${version.baseModel}\n`;
-                if (version.trainedWords && version.trainedWords.length > 0) {
-                    frontmatter += `- **Trained Words**: ${version.trainedWords.join(', ')}\n`;
-                }
-            }
-
-            frontmatter += `\n`;
-        }
-
-        // Add HuggingFace model details section
-        if (enhancedMetadata?.huggingfaceModel) {
-            frontmatter += `## HuggingFace Details\n\n`;
-            
-            const hfModel = enhancedMetadata.huggingfaceModel;
-            frontmatter += `- **Model ID**: ${hfModel.id}\n`;
-            frontmatter += `- **Author**: ${hfModel.author}\n`;
-            if (hfModel.downloads) frontmatter += `- **Downloads**: ${hfModel.downloads.toLocaleString()}\n`;
-            if (hfModel.likes) frontmatter += `- **Likes**: ${hfModel.likes.toLocaleString()}\n`;
-            if (hfModel.pipeline_tag) frontmatter += `- **Pipeline**: ${hfModel.pipeline_tag}\n`;
-            if (hfModel.library_name) frontmatter += `- **Library**: ${hfModel.library_name}\n`;
-            if (hfModel.card_data?.license) frontmatter += `- **License**: ${hfModel.card_data.license}\n`;
-            if (hfModel.created_at) frontmatter += `- **Created**: ${new Date(hfModel.created_at).toLocaleDateString()}\n`;
-            if (hfModel.last_modified) frontmatter += `- **Last Modified**: ${new Date(hfModel.last_modified).toLocaleDateString()}\n`;
-
-            frontmatter += `\n`;
-        }
-
-        // Add model relationships section
-        if (enhancedMetadata?.relationships) {
-            const rel = enhancedMetadata.relationships;
-            let hasRelationships = false;
-            let relationshipContent = `## Model Relationships\n\n`;
-
-            if (rel.parentModelId) {
-                relationshipContent += `- **Parent Model ID**: ${rel.parentModelId}\n`;
-                hasRelationships = true;
-            }
-
-            if (rel.childModels && rel.childModels.length > 0) {
-                relationshipContent += `- **Child Models**: ${rel.childModels.length} models\n`;
-                hasRelationships = true;
-            }
-
-            if (rel.compatibleModels && rel.compatibleModels.length > 0) {
-                relationshipContent += `- **Compatible Models**: ${rel.compatibleModels.length} models\n`;
-                hasRelationships = true;
-            }
-
-            if (rel.derivedFrom) {
-                relationshipContent += `- **Derived From**: ${rel.derivedFrom}\n`;
-                hasRelationships = true;
-            }
-
-            if (hasRelationships) {
-                frontmatter += relationshipContent + `\n`;
-            }
-        }
-
-        // Add information about related files if any exist
-        if (otherFiles.length > 0) {
-            frontmatter += `## Related Files\n\nThis model is part of a package that includes the following additional files:\n\n`;
-            otherFiles.forEach(file => {
-                const fileExt = path.extname(file).toLowerCase();
-                let fileType = 'Unknown';
-                if (['.md', '.txt', '.readme'].some(ext => file.toLowerCase().includes(ext))) {
-                    fileType = 'Documentation';
-                } else if (['.json'].includes(fileExt)) {
-                    fileType = 'Configuration';
-                } else if (['.yaml', '.yml'].includes(fileExt)) {
-                    fileType = 'Configuration';
-                } else if (['.py', '.ipynb'].includes(fileExt)) {
-                    fileType = 'Code/Script';
-                } else if (['.jpg', '.jpeg', '.png', '.webp'].includes(fileExt)) {
-                    fileType = 'Sample Image';
-                }
-                
-                frontmatter += `- **${file}** (${fileType})\n`;
-            });
-            frontmatter += `\n`;
-        }
-
-        return frontmatter;
+        return frontmatter + content;
     }
 
     /**
@@ -435,165 +327,122 @@ model_type: "${modelType}"`;
         console.log(`📝 generateFrontmatterWithMetadata: Provider: ${metadata?.provider}, CivitAI: ${!!metadata?.civitaiModel}, HF: ${!!metadata?.huggingfaceModel}`);
         
         const modelFilename = path.basename(relativeModelPath);
-        const modelDirectory = path.dirname(relativeModelPath);
         const modelType = this.inferModelType(relativeModelPath);
         
-        // Get related files in the same directory
-        const relatedFiles = directoryInfo?.[modelDirectory] || [];
-        const otherFiles = relatedFiles.filter(file => file !== modelFilename && !isModelFile(file));
-        
-        // Start building frontmatter with basic information
-        let frontmatter = `---
-# Model Information (Workbench Generated)
-model_path: "${relativeModelPath.replace(/\\/g, '/')}"
-model_filename: "${modelFilename}"
-model_type: "${modelType}"`;
-
-        // Add enhanced metadata if available
-        if (metadata) {
-            // CivitAI model information
-            if (metadata.civitaiModel) {
-                const model = metadata.civitaiModel;
-                frontmatter += `\ncivitai_model_id: ${model.id}`;
-                frontmatter += `\ncivitai_model_name: "${model.name}"`;
-                if (model.description) {
-                    const cleanDescription = model.description.replace(/"/g, '\\"').replace(/\n/g, ' ').substring(0, 200);
-                    frontmatter += `\ncivitai_description: "${cleanDescription}${model.description.length > 200 ? '...' : ''}"`;
-                }
-                if (model.type) frontmatter += `\ncivitai_type: "${model.type}"`;
-                if (model.nsfw !== undefined) frontmatter += `\ncivitai_nsfw: ${model.nsfw}`;
-                if (model.tags && model.tags.length > 0) {
-                    const tags = model.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
-                    frontmatter += `\ncivitai_tags: [${tags}]`;
-                }
-                if (model.creator?.username) frontmatter += `\ncivitai_creator: "${model.creator.username}"`;
-            }
-
-            // CivitAI version information
-            if (metadata.civitaiVersion) {
-                const version = metadata.civitaiVersion;
-                frontmatter += `\ncivitai_version_id: ${version.id}`;
-                frontmatter += `\ncivitai_version_name: "${version.name}"`;
-                if (version.baseModel) frontmatter += `\nbase_model: "${version.baseModel}"`;
-                if (version.trainedWords && version.trainedWords.length > 0) {
-                    const trainedWords = version.trainedWords.slice(0, 10).map((word: string) => `"${word}"`).join(', ');
-                    frontmatter += `\ntrained_words: [${trainedWords}]`;
-                }
-            }
-
-            // HuggingFace model information
-            if (metadata.huggingfaceModel) {
-                const hfModel = metadata.huggingfaceModel;
-                frontmatter += `\nhuggingface_model_id: "${hfModel.id}"`;
-                frontmatter += `\nhuggingface_author: "${hfModel.author}"`;
-                if (hfModel.downloads) frontmatter += `\nhuggingface_downloads: ${hfModel.downloads}`;
-                if (hfModel.likes) frontmatter += `\nhuggingface_likes: ${hfModel.likes}`;
-                if (hfModel.pipeline_tag) frontmatter += `\nhuggingface_pipeline: "${hfModel.pipeline_tag}"`;
-                if (hfModel.tags && hfModel.tags.length > 0) {
-                    const hfTags = hfModel.tags.slice(0, 10).map((tag: string) => `"${tag}"`).join(', ');
-                    frontmatter += `\nhuggingface_tags: [${hfTags}]`;
-                }
-            }
-
-            // Provider and verification status
-            frontmatter += `\nprovider: "${metadata.provider || 'unknown'}"`;
-            if (metadata.isVerified !== undefined) frontmatter += `\nverified: ${metadata.isVerified}`;
-
-            // File information
-            if (metadata.hash) frontmatter += `\nfile_hash: "${metadata.hash}"`;
-            if (metadata.lastSynced) {
-                frontmatter += `\nlast_synced: "${metadata.lastSynced.toISOString()}"`;
-            }
-
-            // Model relationships
-            if (metadata.relationships) {
-                const rel = metadata.relationships;
-                if (rel.parentModelId) frontmatter += `\nparent_model_id: ${rel.parentModelId}`;
-                if (rel.childModels && rel.childModels.length > 0) {
-                    const children = rel.childModels.slice(0, 5).map(childId => `${childId}`).join(', ');
-                    frontmatter += `\nchild_models: [${children}]`;
-                }
-                if (rel.compatibleModels && rel.compatibleModels.length > 0) {
-                    frontmatter += `\ncompatible_models_count: ${rel.compatibleModels.length}`;
-                }
-                if (rel.baseModel) frontmatter += `\nrelationship_base_model: "${rel.baseModel}"`;
-                if (rel.derivedFrom) frontmatter += `\nderived_from: "${rel.derivedFrom}"`;
-            }
-        }
-
-        frontmatter += `\n---\n\n`;
-
-        // Add content sections
-        let content = `# ${modelFilename}\n\n`;
-        
-        // Add description from metadata if available
-        if (metadata?.civitaiModel?.description) {
-            content += `## Description\n\n${metadata.civitaiModel.description}\n\n`;
-        } else if (metadata?.huggingfaceModel?.id) {
-            content += `## About This Model\n\nThis model is available on HuggingFace: [${metadata.huggingfaceModel.id}](https://huggingface.co/${metadata.huggingfaceModel.id})\n\n`;
-        }
-
-        // Add model information section
-        content += `## Model Information\n\n`;
-        content += `- **Type**: ${modelType}\n`;
-        content += `- **Path**: \`${relativeModelPath}\`\n`;
-        
-        if (metadata) {
-            if (metadata.provider && metadata.provider !== 'unknown') {
-                content += `- **Provider**: ${metadata.provider}\n`;
-            }
-            if (metadata.civitaiModel) {
-                content += `- **CivitAI Model**: [${metadata.civitaiModel.name}](https://civitai.com/models/${metadata.civitaiModel.id})\n`;
-                if (metadata.civitaiModel.creator?.username) {
-                    content += `- **Creator**: ${metadata.civitaiModel.creator.username}\n`;
-                }
-            }
-            if (metadata.huggingfaceModel) {
-                content += `- **HuggingFace Model**: [${metadata.huggingfaceModel.id}](https://huggingface.co/${metadata.huggingfaceModel.id})\n`;
-                content += `- **Author**: ${metadata.huggingfaceModel.author}\n`;
-                if (metadata.huggingfaceModel.downloads) {
-                    content += `- **Downloads**: ${metadata.huggingfaceModel.downloads.toLocaleString()}\n`;
-                }
-                if (metadata.huggingfaceModel.likes) {
-                    content += `- **Likes**: ${metadata.huggingfaceModel.likes.toLocaleString()}\n`;
-                }
-            }
-        }
-
-        // Add tags if available
+        // Build tags array (excluding license and region tags) and extract license
         const allTags = new Set<string>();
+        let extractedLicense = '';
+        
         if (metadata?.civitaiModel?.tags) {
-            metadata.civitaiModel.tags.forEach(tag => allTags.add(tag));
+            metadata.civitaiModel.tags.forEach(tag => {
+                const tagLower = tag.toLowerCase();
+                if (tagLower.startsWith('license:')) {
+                    extractedLicense = tag.substring(8); // Remove 'license:' prefix
+                } else if (!tagLower.includes('license') && !tagLower.startsWith('region:')) {
+                    allTags.add(tag);
+                }
+            });
         }
         if (metadata?.huggingfaceModel?.tags) {
-            metadata.huggingfaceModel.tags.forEach(tag => allTags.add(tag));
+            metadata.huggingfaceModel.tags.forEach(tag => {
+                const tagLower = tag.toLowerCase();
+                if (tagLower.startsWith('license:')) {
+                    extractedLicense = tag.substring(8); // Remove 'license:' prefix
+                } else if (!tagLower.includes('license') && !tagLower.startsWith('region:')) {
+                    allTags.add(tag);
+                }
+            });
         }
         
+        // Build frontmatter in the new format
+        let frontmatter = `---\nprovider:`;
+        
+        // Add provider as array
+        if (metadata?.provider && metadata.provider !== 'unknown') {
+            frontmatter += `\n  - ${metadata.provider}`;
+        } else {
+            frontmatter += `\n  - unknown`;
+        }
+        
+        // Add common fields based on provider
+        if (metadata?.huggingfaceModel) {
+            const hfModel = metadata.huggingfaceModel;
+            if (hfModel.downloads) frontmatter += `\ndownloads: ${hfModel.downloads}`;
+            if (hfModel.likes) frontmatter += `\nlikes: ${hfModel.likes}`;
+            if (metadata.isVerified !== undefined) frontmatter += `\nverified: ${metadata.isVerified}`;
+            frontmatter += `\nAuthor: ${hfModel.author}`;
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            if (hfModel.pipeline_tag) {
+                frontmatter += `\npipeline:\n  - ${hfModel.pipeline_tag}`;
+            }
+            if (metadata.relationships?.baseModel) {
+                frontmatter += `\nrelationship_base_model: ${metadata.relationships.baseModel}`;
+            }
+            frontmatter += `\nmodel_id: ${hfModel.id}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+            frontmatter += `\nsource: https://huggingface.co/${hfModel.id}`;
+        } else if (metadata?.civitaiModel) {
+            const model = metadata.civitaiModel;
+            if (model.stats?.downloadCount) frontmatter += `\ndownloads: ${model.stats.downloadCount}`;
+            if (model.stats?.favoriteCount) frontmatter += `\nlikes: ${model.stats.favoriteCount}`;
+            if (metadata.isVerified !== undefined) frontmatter += `\nverified: ${metadata.isVerified}`;
+            if (model.creator?.username) frontmatter += `\nAuthor: ${model.creator.username}`;
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            if (metadata.civitaiVersion?.baseModel) {
+                frontmatter += `\nrelationship_base_model: ${metadata.civitaiVersion.baseModel}`;
+            }
+            frontmatter += `\nmodel_id: ${model.id}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+            frontmatter += `\nsource: https://civitai.com/models/${model.id}`;
+        } else {
+            // Fallback for unknown provider
+            frontmatter += `\nmodel_type:\n  - ${modelType}`;
+            frontmatter += `\nmodel_filename: ${modelFilename}`;
+            frontmatter += `\nmodel_path: ${relativeModelPath.replace(/\\/g, '/')}`;
+        }
+        
+        // Add tags
         if (allTags.size > 0) {
-            content += `\n## Tags\n\n`;
+            frontmatter += `\ntags:`;
             Array.from(allTags).slice(0, 20).forEach(tag => {
-                content += `- ${tag}\n`;
+                frontmatter += `\n  - ${tag}`;
             });
         }
-
-        // Add trained words if available
-        if (metadata?.civitaiVersion?.trainedWords && metadata.civitaiVersion.trainedWords.length > 0) {
-            content += `\n## Trained Words\n\n`;
-            metadata.civitaiVersion.trainedWords.forEach(word => {
-                content += `- \`${word}\`\n`;
-            });
+        
+        // Add license if available
+        if (metadata?.huggingfaceModel?.card_data?.license) {
+            frontmatter += `\nlicense: ${metadata.huggingfaceModel.card_data.license}`;
+        } else if (extractedLicense) {
+            frontmatter += `\nlicense: ${extractedLicense}`;
+        } else if (metadata?.civitaiModel?.allowNoCredit !== undefined) {
+            // CivitAI license info - allowNoCredit is a boolean indicating license restrictions
+            const licenseType = metadata.civitaiModel.allowNoCredit ? 'permissive' : 'restricted';
+            frontmatter += `\nlicense: ${licenseType}`;
         }
-
-        // Add related files section
-        if (otherFiles.length > 0) {
-            content += `\n## Related Files\n\n`;
-            otherFiles.forEach(file => {
-                content += `- \`${file}\`\n`;
-            });
+        
+        // Add last synced
+        if (metadata?.lastSynced) {
+            frontmatter += `\nlast_synced: ${metadata.lastSynced.toISOString()}`;
         }
+        
+        frontmatter += `\n---\n`;
+        
+        // Add content in new format
+        const content = `### Model Information
 
-        // Add usage notes section
-        content += `\n## Usage Notes\n\n*Add your notes about using this model here.*\n\n`;
+| <center>Type</center> | <center>Author</center> | <center>Provider</center> | <center>URL</center> | <center>License</center> | <center>Downloads</center> | Likes           |
+| --------------------- | ----------------------- | ------------------------- | -------------------- | ------------------------ | -------------------------- | --------------- |
+| \`= this.model_type\`   | \`= this.author\`         | \`= this.provider\`         | \`= this.source\`      | \`= this.license\`         | \`= this.downloads\`         |  \`= this.likes\` |
+
+**Tags** : \`$= "#" + dv.current().tags.join(" #")\`
+## Usage Notes
+
+*Add your notes about using this model here.*
+
+
+`;
 
         return frontmatter + content;
     }

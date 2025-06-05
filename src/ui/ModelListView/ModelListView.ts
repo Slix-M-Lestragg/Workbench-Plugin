@@ -42,7 +42,7 @@ export class ModelListView extends ItemView {
         return MODEL_LIST_ICON;
     }
 
-    async onOpen() {
+    async onOpen(isRefresh = false) {
         // Initialize metadata manager if CivitAI integration is enabled
         if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
             this.metadataManager = new ModelMetadataManager(
@@ -205,7 +205,7 @@ export class ModelListView extends ItemView {
                 // --- Render the nested tree ---
                 const treeRootEl = container.createDiv({ cls: 'wb-model-tree-root' });
                 if (this.treeRenderer) {
-                    await this.treeRenderer.renderModelTree(modelTree, treeRootEl); // Start rendering the tree
+                    await this.treeRenderer.renderModelTree(modelTree, treeRootEl, isRefresh); // Pass isRefresh flag
                 }
             }
         } catch (error: unknown) {
@@ -235,8 +235,8 @@ export class ModelListView extends ItemView {
     /**
      * Refresh the model list view
      */
-    private async refresh(): Promise<void> {
-        await this.onOpen();
+    private async refresh(isRefresh = true): Promise<void> {
+        await this.onOpen(isRefresh);
     }
 
     /**
@@ -246,7 +246,7 @@ export class ModelListView extends ItemView {
         if (this.metadataManager) {
             await this.metadataManager.refreshAllMetadata();
         }
-        await this.refresh();
+        await this.refresh(true); // Explicitly mark as refresh
     }
 
     /**
@@ -258,7 +258,7 @@ export class ModelListView extends ItemView {
             // Implementation would depend on how HuggingFace metadata is stored/managed
             console.log('HuggingFace metadata refresh triggered');
         }
-        await this.refresh();
+        await this.refresh(true); // Explicitly mark as refresh
     }
 }
 
