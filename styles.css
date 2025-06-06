@@ -1,3 +1,18 @@
+/*
+ * Workbench Plugin Styles
+ * 
+ * This stylesheet provides comprehensive styling for all UI components in the Workbench Plugin including:
+ * - Settings tab interface with tabbed navigation
+ * - JSON viewer with syntax highlighting and formatting
+ * - Model list view with tree structure and metadata display
+ * - Status bar components and popover interfaces
+ * - Search modal with unified provider results
+ * - Provider icons and visual identification
+ * - Responsive layouts and dark/light theme compatibility
+ * - Animation and transition effects for smooth user experience
+ */
+
+
 /* ===========================================================================
    1. Settings Tab Styles (used by SampleSettingTab in src/settings.ts)
    =========================================================================== */
@@ -247,84 +262,91 @@
     font-family: var(--font-monospace);
 }
 
-/* Styling for the Model List View */
+/* ===========================================================================
+   6. Model List View Styles (used by ModelListView component)
+   =========================================================================== */
+
+/* Main container for the model list view component */
 .wb-model-list-view {
   padding: 10px;
 }
 
+/* Root container for the model tree structure */
 .wb-model-tree-root {
   margin-top: 10px;
 }
 
-/* Style for folder containers */
+/* Folder container styling with collapsible details */
 .wb-model-folder-details {
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
   margin-bottom: 5px;
-  background-color: var(--background-secondary); /* Slightly different background */
+  background-color: var(--background-secondary); /* Distinct background for folders */
 }
 
-/* Style for the clickable folder summary */
+/* Clickable folder summary with custom styling */
 .wb-model-folder-summary {
   padding: 5px 8px;
   cursor: pointer;
-  display: flex; /* Use flexbox for alignment */
-  align-items: center; /* Vertically align icon and text */
+  display: flex; /* Flexbox for icon and text alignment */
+  align-items: center; /* Vertical alignment */
   gap: 5px; /* Space between icon and text */
   font-weight: bold;
   list-style: none; /* Remove default disclosure triangle */
 }
+
+/* Hide default WebKit disclosure marker */
 .wb-model-folder-summary::-webkit-details-marker {
-  display: none; /* Hide default marker in Webkit */
+  display: none;
 }
 
-/* Add custom open/close indicator (optional) */
+/* Custom expand/collapse indicator */
 .wb-model-folder-details > .wb-model-folder-summary::before {
-  content: '▶'; /* Collapsed state */
+  content: '▶'; /* Right arrow for collapsed state */
   display: inline-block;
   margin-right: 5px;
   font-size: 0.8em;
   transition: transform 0.1s ease-in-out;
 }
+
+/* Rotate arrow for expanded state */
 .wb-model-folder-details[open] > .wb-model-folder-summary::before {
-  transform: rotate(90deg); /* Expanded state */
+  transform: rotate(90deg); /* Down arrow for expanded state */
 }
 
 
-/* Indentation and styling for nested content */
+/* Nested folder and file list indentation with visual hierarchy */
 .wb-model-folder-details > .wb-model-folder-details,
 .wb-model-folder-details > .wb-model-file-list {
-  /* Increased margin-left for better visual hierarchy */
-  margin-left: 25px; /* Increased from 20px */
-  padding: 5px 0 5px 10px; /* Add some padding */
-  border-left: 1px dashed var(--background-modifier-border); /* Visual connector */
+  margin-left: 25px; /* Enhanced indentation for better hierarchy */
+  padding: 5px 0 5px 10px; /* Internal padding for content */
+  border-left: 1px dashed var(--background-modifier-border); /* Visual connector line */
   margin-top: 5px;
-  /* Remove the border from the direct child list inside an open folder */
+  /* Remove inherited borders for nested elements */
   border-top: none;
   border-right: none;
   border-bottom: none;
   border-radius: 0;
-  background-color: transparent; /* Ensure nested folders don't inherit the background */
+  background-color: transparent; /* Inherit parent background */
 }
 
-/* Style for file lists */
+/* File list container styling */
 .wb-model-file-list {
   list-style: none;
-  padding-left: 0; /* Remove default ul padding */
-  margin: 0; /* Remove default ul margin */
+  padding-left: 0; /* Reset default ul padding */
+  margin: 0; /* Reset default ul margin */
 }
 
-/* Style for individual file items */
+/* Individual file item styling */
 .wb-model-file-item {
   padding: 3px 8px;
   display: flex;
   align-items: center;
   gap: 5px;
-  /* Add a small left padding to align files slightly inside their folder's border */
-  padding-left: 10px;
+  padding-left: 10px; /* Align files within folder structure */
 }
 
-/* New table-like layout for model rows */
+/* Table-like layout for model file rows with enhanced UX */
 .wb-model-row {
   display: flex;
   justify-content: space-between;
@@ -336,15 +358,18 @@
   transition: background-color 0.2s ease;
 }
 
+/* Hover effect for model rows */
 .wb-model-row:hover {
   background-color: var(--background-modifier-hover);
 }
 
+/* Left section containing filename and primary info */
 .wb-model-left {
   flex: 1;
-  min-width: 0; /* Allow text truncation */
+  min-width: 0; /* Enable text truncation */
 }
 
+/* Filename link styling with accessibility features */
 .wb-model-filename-link {
   color: var(--text-normal);
   text-decoration: none;
@@ -356,11 +381,13 @@
   white-space: nowrap;
 }
 
+/* Filename link hover state */
 .wb-model-filename-link:hover {
   color: var(--text-accent);
   text-decoration: underline;
 }
 
+/* Right section containing metadata and actions */
 .wb-model-right {
   display: flex;
   align-items: center;
@@ -368,6 +395,7 @@
   flex-shrink: 0;
 }
 
+/* Website/provider link styling */
 .wb-model-website-link {
   display: flex;
   align-items: center;
@@ -376,34 +404,43 @@
   transition: color 0.2s ease;
 }
 
+/* Website link hover state */
 .wb-model-website-link:hover {
   color: var(--text-accent);
 }
 
+/* Provider icon sizing and positioning */
 .wb-provider-icon {
   width: 16px;
   height: 16px;
 }
 
+/* Model statistics container */
 .wb-model-stats {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
+/* Individual statistic item styling */
 .wb-stat-item {
   font-size: 0.85em;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
+/* ===========================================================================
+   7. CivitAI Integration Styles (used for provider-specific UI components)
+   =========================================================================== */
+
+/* Legacy compatibility marker */
 /* Legacy styles for backward compatibility */
 
 /* ===========================================================================
-   5. CivitAI Integration Styles
+   7. CivitAI Integration Styles (used for provider-specific UI components)
    =========================================================================== */
 
-/* Verified badge */
+/* Verified badge for CivitAI verified models */
 .wb-verified-badge {
     display: inline-block;
     padding: 2px 6px;
@@ -415,7 +452,7 @@
     font-weight: bold;
 }
 
-/* Model type badges */
+/* Model type classification badges with color coding */
 .wb-model-type-checkpoint,
 .wb-model-type-lora,
 .wb-model-type-textualinversion,
@@ -432,42 +469,49 @@
     text-transform: uppercase;
 }
 
+/* Checkpoint models - blue theme */
 .wb-model-type-checkpoint {
     background-color: #3b82f6;
     color: white;
 }
 
+/* LoRA models - green theme */
 .wb-model-type-lora {
     background-color: #10b981;
     color: white;
 }
 
+/* Textual Inversion models - amber theme */
 .wb-model-type-textualinversion {
     background-color: #f59e0b;
     color: white;
 }
 
+/* Hypernetwork models - purple theme */
 .wb-model-type-hypernetwork {
     background-color: #8b5cf6;
     color: white;
 }
 
+/* Aesthetic Gradient models - pink theme */
 .wb-model-type-aestheticgradient {
     background-color: #ec4899;
     color: white;
 }
 
+/* ControlNet models - red theme */
 .wb-model-type-controlnet {
     background-color: #ef4444;
     color: white;
 }
 
+/* Poses models - gray theme */
 .wb-model-type-poses {
     background-color: #6b7280;
     color: white;
 }
 
-/* Model rating display */
+/* Model rating badge display */
 .wb-model-rating {
     display: inline-block;
     padding: 2px 6px;
@@ -479,7 +523,7 @@
     font-weight: 500;
 }
 
-/* Provider icons */
+/* Provider identification icons with consistent sizing */
 .wb-provider-icon {
     display: inline-flex;
     align-items: center;
@@ -493,26 +537,27 @@
     vertical-align: middle;
 }
 
+/* SVG icon sizing within provider icons */
 .wb-provider-icon svg {
     width: 18px;
     height: 18px;
     display: block;
 }
 
-/* Provider-specific styling */
+/* Provider-specific color themes for brand recognition */
 .wb-provider-icon[title*="Civitai"] {
-    color: #4285f4; /* CivitAI blue */
+    color: #4285f4; /* CivitAI signature blue */
 }
 
 .wb-provider-icon[title*="Huggingface"] {
-    color: #ff6b35; /* HuggingFace orange */
+    color: #ff6b35; /* HuggingFace signature orange */
 }
 
 .wb-provider-icon[title*="Unknown"] {
     color: var(--text-muted);
 }
 
-/* Refresh button styling for provider integrations */
+/* Provider-specific refresh buttons with consistent styling */
 .wb-refresh-metadata-btn,
 .wb-refresh-hf-btn {
     display: inline-flex;
@@ -530,24 +575,27 @@
     min-height: 32px;
 }
 
+/* Hover states for refresh buttons */
 .wb-refresh-metadata-btn:hover,
 .wb-refresh-hf-btn:hover {
     background-color: var(--background-modifier-hover);
     border-color: var(--background-modifier-border-hover);
 }
 
+/* Active/pressed state for refresh buttons */
 .wb-refresh-metadata-btn:active,
 .wb-refresh-hf-btn:active {
     background-color: var(--background-modifier-active);
 }
 
+/* Loading state for refresh buttons */
 .wb-refresh-metadata-btn.wb-refreshing,
 .wb-refresh-hf-btn.wb-refreshing {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-/* Ensure icons in refresh buttons are properly sized and centered */
+/* Icon sizing within refresh buttons */
 .wb-refresh-metadata-btn svg,
 .wb-refresh-hf-btn svg {
     width: 18px;
@@ -555,7 +603,7 @@
     display: block;
 }
 
-/* CivitAI refresh button specific styling */
+/* CivitAI-specific refresh button styling */
 .wb-refresh-metadata-btn {
     border-color: #4285f4;
 }
@@ -565,7 +613,7 @@
     border-color: #4285f4;
 }
 
-/* HuggingFace refresh button specific styling */
+/* HuggingFace-specific refresh button styling */
 .wb-refresh-hf-btn {
     border-color: #ff6b35;
 }
@@ -575,13 +623,18 @@
     border-color: #ff6b35;
 }
 
-/* Model details modal */
+/* ===========================================================================
+   8. Model Details Modal Styles (used for detailed model information display)
+   =========================================================================== */
+
+/* Main modal container with responsive sizing */
 .wb-model-details {
     max-width: 600px;
     max-height: 80vh;
     overflow-y: auto;
 }
 
+/* Modal header section */
 .wb-model-header {
     display: flex;
     align-items: center;
@@ -591,11 +644,13 @@
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
+/* Model title styling */
 .wb-model-header h3 {
     margin: 0;
     color: var(--text-normal);
 }
 
+/* Model type indicator badge */
 .wb-model-type {
     padding: 4px 8px;
     background-color: var(--interactive-accent);
@@ -605,6 +660,7 @@
     font-weight: 500;
 }
 
+/* Statistics section layout */
 .wb-model-stats {
     display: flex;
     gap: 12px;
@@ -614,12 +670,14 @@
     border-radius: 6px;
 }
 
+/* Individual statistic items */
 .wb-model-stats span {
     font-size: 0.9em;
     font-weight: 500;
     color: var(--text-muted);
 }
 
+/* Version information section */
 .wb-version-info {
     margin: 16px 0;
     padding: 12px;
@@ -627,33 +685,38 @@
     border-radius: 6px;
 }
 
+/* Version info heading */
 .wb-version-info h4 {
     margin: 0 0 8px 0;
     color: var(--text-normal);
 }
 
+/* Version info description text */
 .wb-version-info p {
     margin: 4px 0;
     font-size: 0.9em;
     color: var(--text-muted);
 }
 
-/* Model tags */
+/* Model tags section */
 .wb-model-tags {
     margin-top: 16px;
 }
 
+/* Tags section heading */
 .wb-model-tags h4 {
     margin: 0 0 8px 0;
     color: var(--text-normal);
 }
 
+/* Tags container with flex layout */
 .wb-tags-list {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
+/* Individual tag styling */
 .wb-tag {
     padding: 3px 8px;
     background-color: var(--background-modifier-border);
@@ -663,12 +726,13 @@
     font-weight: 400;
 }
 
-/* Compatible models display */
+/* Compatible models display section */
 .wb-compatible-models {
     max-height: 400px;
     overflow-y: auto;
 }
 
+/* Compatible model item styling */
 .wb-compatible-item {
     padding: 8px 12px;
     margin: 4px 0;
@@ -678,22 +742,29 @@
     transition: background-color 0.2s ease;
 }
 
+/* Compatible item hover state */
 .wb-compatible-item:hover {
     background-color: var(--background-modifier-hover);
 }
 
+/* Compatible item title styling */
 .wb-compatible-item strong {
     color: var(--text-normal);
     margin-right: 6px;
 }
 
+/* Rating display within compatible items */
 .wb-rating {
     color: var(--text-accent);
     margin-left: 6px;
     font-weight: 500;
 }
 
-/* Loading and error states */
+/* ===========================================================================
+   9. Loading and Error State Styles (used for async operation feedback)
+   =========================================================================== */
+
+/* Loading indicator with pulsing animation */
 .wb-loading-indicator {
     display: inline-block;
     margin-left: 6px;
@@ -705,11 +776,13 @@
     animation: pulse 1.5s infinite;
 }
 
+/* Pulse animation keyframes */
 @keyframes pulse {
     0%, 100% { opacity: 0.6; }
     50% { opacity: 1; }
 }
 
+/* Error indicator styling */
 .wb-error-indicator {
     display: inline-block;
     margin-left: 6px;
@@ -720,14 +793,22 @@
     font-size: 0.7em;
 }
 
-/* Context menu enhancements */
+/* ===========================================================================
+   10. Context Menu Enhancements (used for right-click menu styling)
+   =========================================================================== */
+
+/* CivitAI-specific menu items with visual separation */
 .menu .menu-item[data-civitai="true"] {
     border-top: 1px solid var(--background-modifier-border);
     margin-top: 4px;
     padding-top: 4px;
 }
 
-/* Settings section for CivitAI */
+/* ===========================================================================
+   11. Settings Section Styles (used in settings tab interface)
+   =========================================================================== */
+
+/* CivitAI settings section container */
 .wb-civitai-settings {
     margin: 16px 0;
     padding: 16px;
@@ -735,33 +816,36 @@
     border-radius: 6px;
 }
 
+/* Settings section heading */
 .wb-civitai-settings h3 {
     margin: 0 0 12px 0;
     color: var(--text-normal);
     font-size: 1.1em;
 }
 
+/* Individual setting item */
 .wb-civitai-settings .setting-item {
     margin: 8px 0;
 }
 
+/* Setting description text */
 .wb-civitai-settings .setting-item-description {
     color: var(--text-muted);
     font-size: 0.9em;
     margin-top: 4px;
 }
 
-/* API key input styling */
+/* API key input field with monospace font */
 .wb-api-key-input {
     font-family: var(--font-monospace);
     letter-spacing: 0.5px;
 }
 
-/* =========================================================================
-   HuggingFace Search Modal Styles
+/* ===========================================================================
+   12. HuggingFace Search Modal Styles (used by HF integration components)
    =========================================================================== */
 
-/* HuggingFace Search Modal Styles */
+/* Main HuggingFace search modal container */
 .wb-hf-search-modal {
     max-width: 900px;
     max-height: 80vh;
@@ -770,6 +854,7 @@
     flex-direction: column;
 }
 
+/* Modal heading with border separator */
 .wb-hf-search-modal h2 {
     margin-bottom: 1rem;
     color: var(--text-normal);
@@ -777,19 +862,21 @@
     padding-bottom: 0.5rem;
 }
 
-/* Search Section */
+/* Search input section */
 .wb-search-section {
     margin-bottom: 1rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
+/* Search input and button container */
 .wb-search-input-container {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
+/* Search input field styling */
 .wb-search-input {
     flex: 1;
     padding: 0.5rem;
@@ -800,12 +887,14 @@
     font-size: 14px;
 }
 
+/* Search input focus state */
 .wb-search-input:focus {
     outline: none;
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 2px var(--interactive-accent-hover);
 }
 
+/* Search button styling */
 .wb-search-btn {
     padding: 0.5rem 1rem;
     background: var(--interactive-accent);
@@ -818,16 +907,18 @@
     transition: background 0.2s;
 }
 
+/* Search button hover state */
 .wb-search-btn:hover {
     background: var(--interactive-accent-hover);
 }
 
+/* Search button disabled state */
 .wb-search-btn:disabled {
     background: var(--background-modifier-border);
     cursor: not-allowed;
 }
 
-/* Provider Section */
+/* Provider selection section */
 .wb-provider-section {
     display: flex;
     align-items: center;
@@ -835,6 +926,7 @@
     margin-bottom: 1rem;
 }
 
+/* Provider selection label */
 .wb-provider-label {
     font-size: 14px;
     font-weight: 500;
@@ -842,6 +934,7 @@
     min-width: fit-content;
 }
 
+/* Provider dropdown select */
 .wb-provider-select {
     padding: 0.5rem;
     border: 1px solid var(--background-modifier-border);
@@ -852,7 +945,7 @@
     min-width: 150px;
 }
 
-/* Filter Section - Enhanced Layout */
+/* Filter section with enhanced layout */
 .wb-filter-section {
     display: flex;
     flex-direction: column;
@@ -860,6 +953,7 @@
     padding: 1rem 0;
 }
 
+/* Filter row layout with responsive flex wrapping */
 .wb-filter-row {
     display: flex;
     gap: 1.5rem;
@@ -867,6 +961,7 @@
     flex-wrap: wrap;
 }
 
+/* Individual filter group container */
 .wb-filter-group {
     display: flex;
     flex-direction: column;
@@ -874,6 +969,7 @@
     min-width: 140px;
 }
 
+/* Filter group labels */
 .wb-filter-label {
     font-size: 13px;
     font-weight: 500;
@@ -881,6 +977,7 @@
     margin: 0;
 }
 
+/* Filter dropdown selects */
 .wb-filter-select {
     padding: 0.5rem;
     border: 1px solid var(--background-modifier-border);
@@ -891,13 +988,14 @@
     min-width: 140px;
 }
 
+/* Filter select focus state */
 .wb-filter-select:focus {
     outline: none;
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 2px var(--interactive-accent-hover);
 }
 
-/* Legacy filter styles (keeping for backward compatibility) */
+/* Legacy filter styles maintained for backward compatibility */
 .wb-filter-section label {
     font-size: 13px;
     font-weight: 500;
@@ -914,7 +1012,11 @@
     font-size: 13px;
 }
 
-/* Results Section */
+/* ===========================================================================
+   13. Results Display Styles (used for search results and model listings)
+   =========================================================================== */
+
+/* Results section container with flexible layout */
 .wb-results-section {
     flex: 1;
     overflow: hidden;
@@ -922,12 +1024,14 @@
     flex-direction: column;
 }
 
+/* Scrollable results container */
 .wb-results-container {
     flex: 1;
     overflow-y: auto;
     padding: 0.5rem 0;
 }
 
+/* Loading state indicator */
 .wb-loading {
     text-align: center;
     padding: 2rem;
@@ -935,6 +1039,7 @@
     font-style: italic;
 }
 
+/* Error state display */
 .wb-error {
     text-align: center;
     padding: 2rem;
@@ -944,6 +1049,7 @@
     margin: 1rem 0;
 }
 
+/* No results state */
 .wb-no-results {
     text-align: center;
     padding: 2rem;
@@ -951,13 +1057,14 @@
     font-style: italic;
 }
 
-/* Results List */
+/* Results list container */
 .wb-results-list {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
+/* Individual model card in results */
 .wb-model-card {
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
@@ -966,15 +1073,18 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* Model card hover effect */
 .wb-model-card:hover {
     border-color: var(--interactive-accent);
     box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
 }
 
+/* Model card header section */
 .wb-model-header {
     margin-bottom: 0.5rem;
 }
 
+/* Model title styling */
 .wb-model-title {
     margin: 0 0 0.25rem 0;
     font-size: 16px;
@@ -982,18 +1092,21 @@
     color: var(--text-normal);
 }
 
+/* Model author information */
 .wb-model-author {
     font-size: 13px;
     color: var(--text-muted);
     font-style: italic;
 }
 
+/* Model statistics row */
 .wb-model-stats {
     display: flex;
     gap: 1rem;
     margin-bottom: 0.5rem;
 }
 
+/* Individual statistic item */
 .wb-stat {
     font-size: 13px;
     color: var(--text-muted);
@@ -1002,6 +1115,7 @@
     gap: 0.25rem;
 }
 
+/* Model tags container */
 .wb-model-tags {
     display: flex;
     gap: 0.25rem;
@@ -1009,6 +1123,7 @@
     flex-wrap: wrap;
 }
 
+/* Individual tag styling */
 .wb-tag {
     background: var(--background-modifier-border);
     color: var(--text-muted);
@@ -1018,10 +1133,12 @@
     font-weight: 500;
 }
 
+/* Pipeline tag section */
 .wb-pipeline-tag {
     margin-bottom: 0.75rem;
 }
 
+/* Pipeline indicator badge */
 .wb-pipeline {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
@@ -1031,12 +1148,18 @@
     font-weight: 500;
 }
 
+/* Model action buttons container */
 .wb-model-actions {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.75rem;
 }
 
+/* ===========================================================================
+   14. Action Button Styles (used for user interaction elements)
+   =========================================================================== */
+
+/* Base action button styling */
 .wb-action-btn {
     padding: 0.5rem 1rem;
     border: 1px solid var(--background-modifier-border);
@@ -1049,11 +1172,13 @@
     transition: all 0.2s;
 }
 
+/* Action button hover state */
 .wb-action-btn:hover {
     background: var(--background-modifier-hover);
     border-color: var(--interactive-accent);
 }
 
+/* View button with accent styling */
 .wb-view-btn {
     border-color: var(--interactive-accent);
     color: var(--interactive-accent);
@@ -1064,6 +1189,7 @@
     color: var(--text-on-accent);
 }
 
+/* Download button with success styling */
 .wb-download-btn {
     border-color: var(--interactive-success);
     color: var(--interactive-success);
@@ -1074,13 +1200,18 @@
     color: var(--text-on-accent);
 }
 
-/* Files Modal */
+/* ===========================================================================
+   15. File Management Modal Styles (used for file selection and download)
+   =========================================================================== */
+
+/* Files list container with scrolling */
 .wb-files-list {
     max-height: 400px;
     overflow-y: auto;
     margin: 1rem 0;
 }
 
+/* Individual file item layout */
 .wb-file-item {
     display: flex;
     align-items: center;
@@ -1089,10 +1220,12 @@
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
+/* Remove border from last file item */
 .wb-file-item:last-child {
     border-bottom: none;
 }
 
+/* File name display with monospace font */
 .wb-file-name {
     flex: 1;
     font-family: var(--font-monospace);
@@ -1100,6 +1233,7 @@
     color: var(--text-normal);
 }
 
+/* File size information */
 .wb-file-size {
     font-size: 12px;
     color: var(--text-muted);
@@ -1107,6 +1241,7 @@
     text-align: right;
 }
 
+/* Download file button */
 .wb-download-file-btn {
     padding: 0.25rem 0.5rem;
     background: var(--interactive-accent);
@@ -1123,6 +1258,7 @@
     background: var(--interactive-accent-hover);
 }
 
+/* Modal close button */
 .wb-modal-close-btn {
     padding: 0.5rem 1rem;
     background: var(--background-modifier-border);
@@ -1138,24 +1274,32 @@
     background: var(--background-modifier-hover);
 }
 
-/* Responsive Design */
+/* ===========================================================================
+   16. Responsive Design (media queries for mobile and small screen support)
+   =========================================================================== */
+
+/* Responsive adjustments for mobile devices */
 @media (max-width: 600px) {
+    /* Stack filter sections vertically on small screens */
     .wb-filter-section {
         flex-direction: column;
         align-items: stretch;
         gap: 0.5rem;
     }
     
+    /* Stack action buttons vertically on small screens */
     .wb-model-actions {
         flex-direction: column;
     }
     
+    /* Stack file item elements vertically on small screens */
     .wb-file-item {
         flex-direction: column;
         align-items: stretch;
         gap: 0.5rem;
     }
     
+    /* Align file size text to left on small screens */
     .wb-file-size {
         text-align: left;
     }

@@ -1,18 +1,56 @@
-import type Workbench from './main';
-import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
-import { Notice, TFile } from 'obsidian'; // Import TFile
-import { MODEL_LIST_VIEW_TYPE } from './types/ui'; // Import for view type
-import { testCivitAIIntegration } from './comfy/testIntegration'; // Import CivitAI test function
+/**
+ * Command Registration for Workbench Plugin
+ * 
+ * This file defines and registers all available commands for the Workbench Plugin including:
+ * - ComfyUI launch commands for different platforms and installation types
+ * - Connection management commands (connect, disconnect, check status)
+ * - Model management commands (open model browser, refresh metadata)
+ * - System monitoring commands (log state, test integrations)
+ * - UI navigation commands (open/close views, toggle polling)
+ * - Workflow execution commands for JSON files
+ * - Ribbon icon setup and status visualization
+ */
+
+// ===========================================================================
+// IMPORTS AND DEPENDENCIES  
+// ===========================================================================
+
+    // Core Obsidian and Plugin Imports
+    import type Workbench from './main';
+    import { Notice, TFile } from 'obsidian';
+    
+    // ComfyUI Integration
+    import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch';
+    import { testCivitAIIntegration } from './comfy/testIntegration';
+    
+    // UI Types and Constants
+    import { MODEL_LIST_VIEW_TYPE } from './types/ui';
 
 /**
- * Registers all Workbench plugin commands.
- * @param pluginInstance The Workbench plugin instance.
+ * Registers all Workbench plugin commands with the Obsidian command palette.
+ * 
+ * This function is the central command registration hub that sets up:
+ * - Platform-specific ComfyUI launch commands
+ * - Connection management and status monitoring commands  
+ * - Model management and metadata commands
+ * - UI view management commands
+ * - System integration testing commands
+ * - Ribbon icon setup for visual status feedback
+ * 
+ * @param pluginInstance - The main Workbench plugin instance
  */
 export function registerCommands(pluginInstance: Workbench): void {
-    /**
-     * Command: Launch ComfyUI Desktop App (macOS).
-     * @id launch-comfyui-desktop-app
-     * @description Starts the native ComfyUI desktop application on macOS.
+    
+    // ===========================================================================
+    // COMFYUI LAUNCH COMMANDS
+    // ===========================================================================
+    
+    /*
+     * Command: Launch ComfyUI Desktop App (macOS)
+     * 
+     * Launches the native ComfyUI desktop application specifically for macOS systems.
+     * This command is optimized for macOS and provides the most stable ComfyUI experience
+     * on Apple platforms.
      */
     pluginInstance.addCommand({
         id: 'launch-comfyui-desktop-app',
@@ -22,10 +60,29 @@ export function registerCommands(pluginInstance: Workbench): void {
         },
     });
 
-    /**
-     * Command: Log ComfyUI State.
-     * @id log-comfyui-state
-     * @description Outputs the current ComfyUI connection status and API object to the console.
+    /*
+     * Command: Launch ComfyUI Script
+     * 
+     * Launches ComfyUI via the configured script or portable installation.
+     * Works across platforms with proper device-specific path configuration.
+     */
+    pluginInstance.addCommand({
+        id: 'launch-comfyui-script',
+        name: 'Launch ComfyUI Script',
+        callback: () => {
+            launchComfyUI(pluginInstance);
+        },
+    });
+    
+    // ===========================================================================
+    // SYSTEM MONITORING AND DEBUG COMMANDS
+    // ===========================================================================
+
+    /*
+     * Command: Log ComfyUI State
+     * 
+     * Outputs comprehensive ComfyUI connection status and API state to console.
+     * Useful for debugging connection issues and monitoring plugin state.
      */
     pluginInstance.addCommand({
         id: 'log-comfyui-state',
@@ -37,23 +94,15 @@ export function registerCommands(pluginInstance: Workbench): void {
         },
     });
 
-    /**
-     * Command: Launch ComfyUI Script.
-     * @id launch-comfyui-script
-     * @description Starts ComfyUI via the configured script or portable installation.
-     */
-    pluginInstance.addCommand({
-        id: 'launch-comfyui-script',
-        name: 'Launch ComfyUI Script',
-        callback: () => {
-            launchComfyUI(pluginInstance);
-        },
-    });
+    // ===========================================================================
+    // WORKFLOW EXECUTION COMMANDS
+    // ===========================================================================
 
-    /**
-     * Command: Run Workflow from Active File.
-     * @id run-comfyui-workflow-from-active-file
-     * @description If ComfyUI is Ready or Busy and a .json file is active, executes that workflow.
+    /*
+     * Command: Run Workflow from Active File
+     * 
+     * Executes a ComfyUI workflow from the currently active JSON file.
+     * Only available when ComfyUI is connected and a JSON workflow file is open.
      */
     pluginInstance.addCommand({
         id: 'run-comfyui-workflow-from-active-file',
@@ -75,11 +124,16 @@ export function registerCommands(pluginInstance: Workbench): void {
             return true;
         },
     });
+    
+    // ===========================================================================
+    // MODEL MANAGEMENT COMMANDS
+    // ===========================================================================
 
-    /**
-     * Command: Show ComfyUI Models.
-     * @id show-comfyui-models
-     * @description Opens a view listing available models in the ComfyUI models directory.
+    /*
+     * Command: Show ComfyUI Models
+     * 
+     * Opens the model browser view for managing and exploring available AI models.
+     * Provides access to model metadata, provider information, and note management.
      */
     pluginInstance.addCommand({
         id: 'show-comfyui-models',
@@ -103,11 +157,16 @@ export function registerCommands(pluginInstance: Workbench): void {
             );
         },
     });
+    
+    // ===========================================================================
+    // INTEGRATION TESTING COMMANDS
+    // ===========================================================================
 
-    /**
-     * Command: Test CivitAI Integration.
-     * @id test-civitai-integration
-     * @description Tests the CivitAI API connection and search functionality.
+    /*
+     * Command: Test CivitAI Integration
+     * 
+     * Performs comprehensive testing of CivitAI API integration and connectivity.
+     * Useful for debugging provider integration issues and validating API keys.
      */
     pluginInstance.addCommand({
         id: 'test-civitai-integration',
@@ -117,10 +176,11 @@ export function registerCommands(pluginInstance: Workbench): void {
         },
     });
 
-    /**
-     * Command: Refresh CivitAI Metadata.
-     * @id refresh-civitai-metadata
-     * @description Refreshes all CivitAI metadata for models.
+    /*
+     * Command: Refresh CivitAI Metadata
+     * 
+     * Forces a refresh of all CivitAI metadata for models in the current collection.
+     * Only available when CivitAI integration is enabled in settings.
      */
     pluginInstance.addCommand({
         id: 'refresh-civitai-metadata',
@@ -144,39 +204,42 @@ export function registerCommands(pluginInstance: Workbench): void {
             return true;
         },
     });
+    
+    // ===========================================================================
+    // RIBBON ICON SETUP
+    // ===========================================================================
 
     /**
-     * Ribbon Icon: Launch or Open ComfyUI.
-     * @description Adds a toolbar icon that launches ComfyUI if disconnected/error,
-     * or opens the web UI if ready/busy. The icon changes based on status.
+     * Ribbon Icon: Launch or Open ComfyUI
+     * Creates a dynamic toolbar icon that provides contextual actions based on ComfyUI connection status:
+     * 
+     * - Disconnected/Error states: Attempts to launch ComfyUI
+     * - Ready/Busy states: Opens ComfyUI web interface in browser
+     * - Icon and tooltip update automatically based on current status
+     * - Provides immediate visual feedback about ComfyUI availability
      */
     // Use a placeholder icon initially, it will be updated immediately by updateRibbonIcon
-    const initialIcon = 'image'; // Or any valid icon name
+    const initialIcon = 'image'; // Default launch icon
     const initialTooltip = 'Loading ComfyUI Status...'; // Placeholder tooltip
-    pluginInstance.ribbonIconEl = pluginInstance.addRibbonIcon(initialIcon, initialTooltip, (evt: MouseEvent) => { // Assign the returned element
+    pluginInstance.ribbonIconEl = pluginInstance.addRibbonIcon(initialIcon, initialTooltip, (evt: MouseEvent) => {
         const status = pluginInstance.currentComfyStatus;
         const apiUrl = pluginInstance.settings.comfyApiUrl?.trim();
 
         if (status === 'Ready' || status === 'Busy') {
-            // If connected, open the web UI
+            // If connected, open the web UI in browser
             if (apiUrl) {
                 window.open(apiUrl, '_blank');
             } else {
                 new Notice("ComfyUI API URL is not set in settings.");
             }
-            // Tooltip/icon update is handled centrally by updateStatusBar -> updateRibbonIcon
+            // Icon and tooltip updates are handled centrally by updateStatusBar -> updateRibbonIcon
         } else {
-            // If disconnected, launching, connecting, or error state, attempt to launch
+            // If disconnected, launching, connecting, or error state, attempt to launch ComfyUI
             launchComfyUI(pluginInstance);
-            // Tooltip/icon update is handled centrally by updateStatusBar -> updateRibbonIcon
+            // Icon and tooltip updates are handled centrally by updateStatusBar -> updateRibbonIcon
         }
     });
 
-    // Remove the initial tooltip setting here, it's handled in main.ts onload
-    // const initialStatus = pluginInstance.currentComfyStatus;
-    // if (initialStatus === 'Ready' || initialStatus === 'Busy') {
-    //     pluginInstance.ribbonIconEl.ariaLabel = 'Open ComfyUI Web Interface';
-    // } else {
-    //     pluginInstance.ribbonIconEl.ariaLabel = 'Launch ComfyUI';
-    // }
+    // Note: Icon and tooltip are updated immediately after registration in main.ts onload()
+    // via updateRibbonIcon() call, so no manual initial setup is needed here
 }

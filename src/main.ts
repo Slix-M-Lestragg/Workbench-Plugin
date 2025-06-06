@@ -1,79 +1,187 @@
-// Imports
-// -------------------------
-import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, App, setIcon } from 'obsidian'; // Added setIcon
-import * as path from 'path';
-import {
-    WorkbenchSettings,
-    DEFAULT_SETTINGS,
-    SampleSettingTab,
-    OperatingSystem,
-    DeviceSpecificSettings,
-    DEFAULT_DEVICE_SETTINGS,
-    getCurrentOS, // from [src/settings.ts](src/settings.ts)
-    ComfyInstallType
-} from './settings';
-import { ComfyStatus, SystemStats, QueueInfo } from './types/comfy'; // from [src/comfy/types.ts](src/comfy/types.ts)
-import { ComfyApi } from '@saintno/comfyui-sdk';
-import { setupStatusBar, updateStatusBar } from './ui/components/status_bar'; // from [src/ui/status_bar.ts](src/ui/status_bar.ts)
-import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api'; // from [src/comfy/api.ts](src/comfy/api.ts)
-import { startPolling, stopPolling } from './comfy/polling'; // from [src/comfy/polling.ts](src/comfy/polling.ts)
-import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](src/comfy/launch.ts)
-import { registerCommands } from './commands'; // from [src/commands.ts](src/commands.ts)
-import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
-import { JsonView } from './ui/views/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
-import { JSON_VIEW_TYPE } from './types/ui'; // from [src/types/ui.ts](src/types/ui.ts)
-import { 
-    JSON_CUSTOM_ICON_NAME, 
-    JSON_CUSTOM_ICON_SVG,
-    CIVITAI_ICON_NAME,
-    CIVITAI_ICON_SVG,
-    HUGGINGFACE_ICON_NAME,
-    HUGGINGFACE_ICON_SVG,
-    UNKNOWN_PROVIDER_ICON_NAME,
-    UNKNOWN_PROVIDER_ICON_SVG 
-} from './ui/utilities/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
-import { ModelListView } from './ui/views/ModelListView/ModelListView'; // Import for ModelListView
-import { MODEL_LIST_VIEW_TYPE } from './types/ui'; // Import from centralized ui.ts
+/** 
+ * Main entry point for the Workbench Plugin
+ * 
+ * This file contains the core plugin class that manages:
+ * - ComfyUI connection and API integration
+ * - Model management and metadata enrichment
+ * - UI components (status bar, ribbon, views)
+ * - Cross-platform device settings
+ * - File menu integration and workflow execution
+ */
 
-// Main Plugin Class: Workbench
-// -------------------------
+
+// ===========================================================================
+// IMPORTS
+// ===========================================================================
+// Core Obsidian imports for plugin functionality
+    import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, setIcon } from 'obsidian';
+    import * as path from 'path';
+
+// Settings and configuration management
+    import {
+        WorkbenchSettings,
+        DEFAULT_SETTINGS,
+        SampleSettingTab,
+        OperatingSystem,
+        DeviceSpecificSettings,
+        DEFAULT_DEVICE_SETTINGS,
+        getCurrentOS,
+        ComfyInstallType
+    } from './settings';
+
+// Type definitions for ComfyUI integration
+    import { ComfyStatus, SystemStats, QueueInfo } from './types/comfy';
+    import { ComfyApi } from '@saintno/comfyui-sdk';
+
+// UI components and status management
+    import { setupStatusBar, updateStatusBar } from './ui/components/status_bar';
+
+// ComfyUI API and connection management
+    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api';
+    import { startPolling, stopPolling } from './comfy/polling';
+    import { launchComfyUI } from './comfy/launch';
+    import { runWorkflow } from './comfy/generation';
+
+// Command registration and workflow execution
+    import { registerCommands } from './commands';
+
+// Custom views and UI components
+    import { JsonView } from './ui/views/JsonViewer';
+    import { JSON_VIEW_TYPE } from './types/ui';
+    import { ModelListView } from './ui/views/ModelListView/ModelListView';
+    import { MODEL_LIST_VIEW_TYPE } from './types/ui';
+
+// Custom icons for provider identification
+    import { 
+        JSON_CUSTOM_ICON_NAME, 
+        JSON_CUSTOM_ICON_SVG,
+        CIVITAI_ICON_NAME,
+        CIVITAI_ICON_SVG,
+        HUGGINGFACE_ICON_NAME,
+        HUGGINGFACE_ICON_SVG,
+        UNKNOWN_PROVIDER_ICON_NAME,
+        UNKNOWN_PROVIDER_ICON_SVG 
+    } from './ui/utilities/icons';
+
+
+
+// ===========================================================================
+// MAIN PLUGIN CLASS
+// ===========================================================================
+
+/* Workbench Plugin - Main class that orchestrates all plugin functionality
+ * 
+ * This class serves as the central coordinator for:
+ * - ComfyUI integration and connection management
+ * - Model metadata enrichment and provider integration  
+ * - Cross-platform settings and device-specific configurations
+ * - UI components including status bar, ribbon icon, and custom views
+ * - File menu integration for workflow execution
+ * - System monitoring and real-time status updates
+ */
 export default class Workbench extends Plugin {
-    // Plugin settings and connection state
+// ===========================================================================
+// CORE PLUGIN STATE
+// ===========================================================================
+    
+    /** Plugin configuration and user settings */
     settings: WorkbenchSettings;
+    
+    /** ComfyUI API client instance for communication */
     comfyApi: ComfyApi | null = null;
+    
+    /** Reference to the status bar element for updates */
     statusBarItemEl: HTMLElement | null = null;
-    ribbonIconEl: HTMLElement | null = null; // Add this line to store the ribbon icon element
+    
+    /** Reference to the ribbon icon element for dynamic updates */
+    ribbonIconEl: HTMLElement | null = null;
+    
+    /** Current connection status with ComfyUI server */
     currentComfyStatus: ComfyStatus = 'Disconnected';
-    pollingIntervalId: number | null = null;
-    pollingRetryCount = 0;
-    pollingRetryTimeoutId: number | null = null;
-    app: App; // Provided by obsidian
-    currentOS: OperatingSystem; // Determined on load
+    
+    /** Operating system detected at plugin load time */
+    currentOS: OperatingSystem;
 
-    // Crystools / System monitoring properties
+
+// ===========================================================================
+// POLLING AND MONITORING STATE
+// ===========================================================================
+    
+    /** Interval ID for periodic connection polling */
+    pollingIntervalId: number | null = null;
+    
+    /** Counter for consecutive polling failures */
+    pollingRetryCount = 0;
+    
+    /** Timeout ID for delayed polling retry attempts */
+    pollingRetryTimeoutId: number | null = null;
+    
+
+// ===========================================================================
+// SYSTEM MONITORING STATE
+// ===========================================================================
+    
+    /** Latest system statistics from ComfyUI (CPU, RAM, GPU) */
     latestSystemStats: SystemStats | null = null;
+    
+    /** Event listener for system monitoring updates */
     systemMonitorListener: ((ev: CustomEvent<unknown>) => void) | null = null;
 
-    // Workflow execution progress properties
+
+// ===========================================================================
+// WORKFLOW EXECUTION STATE
+// ===========================================================================
+    
+    /** Currently executing workflow prompt ID */
     currentRunningPromptId: string | null = null;
+    
+    /** Current progress value for workflow execution */
     currentProgressValue: number | null = null;
+    
+    /** Maximum progress value for current workflow */
     currentProgressMax: number | null = null;
+    
+    /** Event listener for workflow progress updates */
     progressListener: ((ev: CustomEvent<unknown>) => void) | null = null;
 
-    
-// Public Methods Exposed to Other Modules
-// -------------------------
+
+// ===========================================================================
+// PUBLIC API METHODS
+// ===========================================================================
+    /* Delegated method for starting ComfyUI connection polling
+     * This enables other modules to initiate polling through the main plugin instance
+     */
     public startPolling = () => startPolling(this);
+    
+    /* Delegated method for stopping ComfyUI connection polling  
+     * This enables other modules to stop polling through the main plugin instance
+     */
     public stopPolling = () => stopPolling(this);
+    
+    /* Delegated method for launching ComfyUI application
+     * This enables other modules to launch ComfyUI through the main plugin instance
+     */
     public launchComfyUI = () => launchComfyUI(this);
+    
+    /* Delegated method for checking ComfyUI connection status
+     * This enables other modules to test connectivity through the main plugin instance
+     */
     public checkComfyConnection = () => checkComfyConnection(this);
+    
+    /* Delegated method for executing workflows from files
+     * This enables other modules to run workflows through the main plugin instance
+     * @param file - The TFile containing the workflow JSON
+     */
     public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file);
 
 
-// Helper Methods
-// -------------------------
-    /** Merges device-specific settings with default values.
-     * @returns A DeviceSpecificSettings object for the current OS.
+// ===========================================================================
+// DEVICE AND SYSTEM CONFIGURATION METHODS  
+// ===========================================================================
+    /* Merges device-specific settings with default values for the current operating system.
+     * This method ensures that all required device settings have fallback values from defaults.
+     * 
+     * @returns A complete DeviceSpecificSettings object for the current OS with all required properties
      */
     public getCurrentDeviceSettings(): DeviceSpecificSettings {
         const osSettings = this.settings.deviceSettings?.[this.currentOS] ?? {};
@@ -83,7 +191,14 @@ export default class Workbench extends Plugin {
         };
     }
 
-    /** Fetch system statistics using the API.
+
+// ===========================================================================
+// SYSTEM MONITORING AND API METHODS
+// ===========================================================================
+    /* Fetch current system statistics from ComfyUI server including CPU, RAM, and GPU usage.
+     * This method provides real-time hardware monitoring capabilities for performance tracking.
+     * 
+     * @returns Promise<SystemStats | null> - System statistics object or null if unavailable
      */
     public async getSystemStats(): Promise<SystemStats | null> {
         if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
@@ -99,7 +214,10 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /** Fetch the current queue information from the API.
+    /* Fetch current queue information from ComfyUI server including pending and running jobs.
+     * This method provides insight into workflow execution status and queue management.
+     * 
+     * @returns Promise<QueueInfo | null> - Queue information object or null if unavailable
      */
     public async getQueueInfo(): Promise<QueueInfo | null> {
         if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
@@ -114,7 +232,21 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /** Updates the ribbon icon based on the current ComfyUI status. */
+
+// ===========================================================================
+// UI STATE MANAGEMENT METHODS
+// ===========================================================================
+    /* Updates the ribbon icon based on the current ComfyUI connection status.
+     * This method provides visual feedback to users about the current state of ComfyUI integration.
+     * 
+     * The icon changes dynamically to reflect different states:
+     * - 'image': Default launch state (Disconnected)
+     * - 'app-window': Ready/Busy states (can open web interface)
+     * - 'loader-2': Transitional states (Connecting/Launching)
+     * - 'alert-circle': Error state (needs attention)
+     * 
+     * @param status - The current ComfyUI connection status
+     */
     public updateRibbonIcon(status: ComfyStatus): void {
         if (!this.ribbonIconEl) {
             // Add a warning if the element doesn't exist when this is called
@@ -150,41 +282,52 @@ export default class Workbench extends Plugin {
     }
 
 
-    // Lifecycle Methods
-    // -------------------------
+// ===========================================================================
+// PLUGIN LIFECYCLE METHODS
+// ===========================================================================
+    /* Plugin initialization method called when the plugin is loaded.
+     * 
+     * This method orchestrates the complete plugin setup process including:
+     * - Operating system detection and settings initialization
+     * - Custom icon registration for provider identification
+     * - UI component initialization (status bar, ribbon, custom views)
+     * - Event listener registration for file operations
+     * - Initial ComfyUI connection attempt with proper error handling
+     * - Automatic polling restart for existing connections
+     */
     async onload() {
-        // Initialize OS and settings
+        // Initialize OS detection and load user settings
         this.currentOS = getCurrentOS();
         await this.loadSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
-        // Register custom icons
+        // Register custom icons for model providers and UI elements
         addIcon(JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG);
         addIcon(CIVITAI_ICON_NAME, CIVITAI_ICON_SVG);
         addIcon(HUGGINGFACE_ICON_NAME, HUGGINGFACE_ICON_SVG);
         addIcon(UNKNOWN_PROVIDER_ICON_NAME, UNKNOWN_PROVIDER_ICON_SVG);
         console.log("Registered custom icons.");
 
-        // Initialize status bar and commands
+        // Initialize UI components and register plugin commands
         setupStatusBar(this);
         registerCommands(this); // This will now set this.ribbonIconEl
 
-        // Initial ribbon icon update after commands are registered
+        // Update ribbon icon to reflect current status after commands are registered
         this.updateRibbonIcon(this.currentComfyStatus);
 
-        // Register the custom JSON view for .json files
+        // Register custom view for JSON workflow files with syntax highlighting
         this.registerView(JSON_VIEW_TYPE, (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf));
         this.registerExtensions(["json"], JSON_VIEW_TYPE);
         console.log(`Registered JSON view for '.json' files.`);
 
-        // Register the new Model List view
+        // Register Model List view for browsing and managing AI models
         this.registerView(
             MODEL_LIST_VIEW_TYPE,
             (leaf: WorkspaceLeaf) => new ModelListView(leaf, this.app, this)
         );
         console.log(`Registered ComfyUI Model List view.`);
 
-        // Register file-menu items for JSON files
+        // Register context menu items for JSON workflow files
         this.registerEvent(this.app.workspace.on('file-menu', (menu: Menu, file) => {
             if (file instanceof TFile && file.extension === 'json') {
                 this.addCopyAndOpenComfyMenuItem(menu, file);
@@ -192,14 +335,14 @@ export default class Workbench extends Plugin {
             }
         }));
 
-        // Register file-modify event to detect changes to model notes
+        // Register file modification listener for automatic model note processing
         this.registerEvent(this.app.vault.on('modify', async (file) => {
             if (file instanceof TFile && file.extension === 'md') {
                 await this.handleModelNoteModification(file);
             }
         }));
 
-        // Initial connection check after a delay
+        // Perform initial connection check with retry logic after a brief delay
         setTimeout(() => {
             console.log("Performing initial ComfyUI connection check...");
             if (this.currentComfyStatus === 'Disconnected') {
@@ -230,12 +373,15 @@ export default class Workbench extends Plugin {
         }, 1000);
     }
 
-    
-// File Menu Helpers
-// -------------------------
-    /** Add "Copy Workflow & Open ComfyUI" item to the file menu.
-     * @param menu The current file menu reference.
-     * @param file The JSON file.
+
+// ===========================================================================
+// FILE MENU INTEGRATION METHODS
+// ===========================================================================
+    /* Add "Copy Workflow & Open ComfyUI" context menu item for JSON workflow files.
+     * This provides users with a quick way to copy workflow data and open the ComfyUI interface.
+     * 
+     * @param menu - The current file context menu reference
+     * @param file - The JSON workflow file being right-clicked
      */
     addCopyAndOpenComfyMenuItem(menu: Menu, file: TFile) {
         const apiUrlString = this.settings.comfyApiUrl?.trim();
@@ -262,9 +408,11 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /** Add "Run ComfyUI Workflow" item to the file menu.
-     * @param menu The current file menu reference.
-     * @param file The JSON file.
+    /* Add "Run ComfyUI Workflow" context menu item for JSON workflow files.
+     * This enables direct workflow execution from the file context menu when ComfyUI is connected.
+     * 
+     * @param menu - The current file context menu reference  
+     * @param file - The JSON workflow file being right-clicked
      */
     addRunWorkflowMenuItem(menu: Menu, file: TFile) {
         if (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy') {
@@ -284,8 +432,10 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /** Execute a ComfyUI workflow from a JSON file.
-     * @param file The JSON file.
+    /* Execute a ComfyUI workflow from a JSON file with comprehensive error handling.
+     * This method loads, parses, and executes workflow files through the ComfyUI API.
+     * 
+     * @param file - The JSON file containing the workflow definition
      */
     async executeWorkflowFromFile(file: TFile) {
         if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
@@ -307,8 +457,18 @@ export default class Workbench extends Plugin {
     }
 
 
-// Unload and Cleanup
-// -------------------------
+// ===========================================================================
+// PLUGIN CLEANUP AND UNLOAD METHODS
+// ===========================================================================
+
+    /* Plugin cleanup method called when the plugin is unloaded.
+     * 
+     * This method ensures proper resource cleanup including:
+     * - Status bar element removal
+     * - Polling process termination
+     * - WebSocket connection closure
+     * - API client cleanup to prevent memory leaks
+     */
     onunload() {
         console.log("Unloading Workbench plugin.");
         this.statusBarItemEl?.remove();
@@ -328,22 +488,30 @@ export default class Workbench extends Plugin {
     }
 
 
-// Settings Methods
-// -------------------------
-    /** Loads settings from disk, merging saved data with defaults.
+// ===========================================================================
+// SETTINGS PERSISTENCE METHODS
+// ===========================================================================
+
+    /* Load user settings from disk with intelligent merging and migration support.
+     * 
+     * This method provides:
+     * - Proper default value fallback for missing settings
+     * - Device-specific settings merging for cross-platform support
+     * - Legacy setting migration for backwards compatibility
+     * - Safe handling of corrupted or incomplete settings data
      */
     async loadSettings() {
         const loadedData = await this.loadData();
         const mergedSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
-        // Merge top-level settings
+        // Merge top-level settings with loaded data
         for (const key in mergedSettings) {
             if (key !== 'deviceSettings' && loadedData && loadedData.hasOwnProperty(key)) {
                 (mergedSettings as Record<string, unknown>)[key] = loadedData[key];
             }
         }
 
-        // Merge device-specific settings
+        // Merge device-specific settings for each supported operating system
         mergedSettings.deviceSettings = mergedSettings.deviceSettings || {};
         for (const osKey of Object.keys(DEFAULT_SETTINGS.deviceSettings) as OperatingSystem[]) {
             const defaultOsSettings = DEFAULT_SETTINGS.deviceSettings[osKey] || {};
@@ -353,7 +521,7 @@ export default class Workbench extends Plugin {
 
         this.settings = mergedSettings;
 
-        // Migrate old top-level comfyUiPath if present
+        // Legacy setting migration: Move old top-level comfyUiPath to device-specific settings
         if (loadedData && loadedData.hasOwnProperty('comfyUiPath') && typeof loadedData.comfyUiPath === 'string') {
             console.log(`Migrating old top-level 'comfyUiPath' setting for OS: ${this.currentOS}`);
             if (!this.settings.deviceSettings[this.currentOS]) {
@@ -374,7 +542,13 @@ export default class Workbench extends Plugin {
         }
     }
 
-    /** Saves settings back to disk.
+    /* Save current settings to disk with legacy cleanup and view synchronization.
+     * 
+     * This method:
+     * - Removes deprecated top-level settings before saving
+     * - Persists current settings state to disk
+     * - Updates all open ModelListView instances with new CivitAI settings
+     * - Ensures settings consistency across plugin components
      */
     async saveSettings() {
         const settingsToSave = { ...this.settings };
@@ -390,7 +564,9 @@ export default class Workbench extends Plugin {
         this.updateModelListViewSettings();
     }
 
-    /** Updates all open ModelListView instances with current CivitAI settings.
+    /* Update all open ModelListView instances with current CivitAI settings.
+     * This ensures that provider configuration changes are immediately reflected
+     * in all active model browser instances without requiring a restart.
      */
     private updateModelListViewSettings(): void {
         const modelListLeaves = this.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
@@ -402,10 +578,24 @@ export default class Workbench extends Plugin {
         });
     }
 
-    /**
-     * Handles modifications to model notes, specifically checking for provider changes
-     * that require reprocessing the model metadata.
-     * @param file The modified markdown file
+
+// ===========================================================================
+// MODEL NOTE MANAGEMENT METHODS
+// ===========================================================================
+    /* Handle modifications to model note files with automatic provider change detection.
+     * 
+     * This method monitors changes to markdown files in the configured model notes folder
+     * and automatically processes provider metadata changes, ensuring model information
+     * stays synchronized with external provider services.
+     * 
+     * Key features:
+     * - Automatic detection of files within the model notes folder
+     * - Provider change detection and processing
+     * - Integration with ModelNoteManager for metadata updates
+     * - User feedback for successful provider changes
+     * - Robust error handling for file processing issues
+     * 
+     * @param file - The modified markdown file to process
      */
     private async handleModelNoteModification(file: TFile): Promise<void> {
         const deviceSettings = this.getCurrentDeviceSettings();
