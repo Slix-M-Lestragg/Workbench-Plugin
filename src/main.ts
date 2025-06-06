@@ -20,7 +20,7 @@ import { startPolling, stopPolling } from './comfy/polling'; // from [src/comfy/
 import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](src/comfy/launch.ts)
 import { registerCommands } from './commands'; // from [src/commands.ts](src/commands.ts)
 import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
-import { JsonView } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
+import { JsonView } from './ui/views/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
 import { JSON_VIEW_TYPE } from './types/ui'; // from [src/types/ui.ts](src/types/ui.ts)
 import { 
     JSON_CUSTOM_ICON_NAME, 
