@@ -3,7 +3,7 @@
 // -------------------------
     import { Notice, requestUrl } from 'obsidian';
     import type Workbench from '../main';
-    import { updateStatusBar } from '../ui/status_bar';
+    import { updateStatusBar } from '../ui/components/status_bar';
     import { startPolling, stopPolling, pollStatus } from './polling';
     import { ComfyApi } from '@saintno/comfyui-sdk'; // Still needed for actions
     import type { ComfyStatus, SystemStats, QueueInfo } from '../types/comfy';
@@ -207,7 +207,7 @@
      * @param wasDisconnected Indicates if the status was 'Disconnected' before this check attempt started. // <-- Add this parameter description
      * @returns Always returns false to indicate connection failure.
      */
-    function handleConnectionFailure(pluginInstance: Workbench, reason: string, isInitialCheck: boolean = false): boolean { // <-- Add wasDisconnected parameter
+    function handleConnectionFailure(pluginInstance: Workbench, reason: string, isInitialCheck = false): boolean { // <-- Add wasDisconnected parameter
         // const wasConnecting = pluginInstance.currentComfyStatus === 'Connecting'; // This might be less reliable now, use wasDisconnected instead if needed.
 
 
@@ -338,7 +338,7 @@
      * @param isInitialCheck Indicates if this is the initial check during plugin load.
      * @returns A promise resolving to true if the API is reachable, false otherwise.
      */
-    export async function checkComfyConnection(pluginInstance: Workbench, isInitialCheck: boolean = false): Promise<boolean> {
+    export async function checkComfyConnection(pluginInstance: Workbench, isInitialCheck = false): Promise<boolean> {
         // Avoid concurrent connection attempts if already connecting or launching.
             if (pluginInstance.currentComfyStatus === 'Connecting' || pluginInstance.currentComfyStatus === 'Launching') {
                 console.log("Connection check skipped: Already connecting or launching.");
@@ -369,8 +369,8 @@
                 return handleConnectionFailure(pluginInstance, 'Invalid ComfyUI API URL format', isInitialCheck);
             }
 
-            const wasDisconnected = pluginInstance.currentComfyStatus === 'Disconnected'; // Check if it was previously disconnected
-    
+            pluginInstance.currentComfyStatus === 'Disconnected'; // Check if it was previously disconnected
+
         // Reset polling retry count for the new connection attempt.
             pluginInstance.pollingRetryCount = 0;
         // Update status bar to indicate connection attempt.

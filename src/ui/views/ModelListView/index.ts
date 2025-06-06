@@ -6,7 +6,6 @@
 export { ModelListView } from './ModelListView';
 export { ModelTreeRenderer } from './ModelTreeRenderer';
 export { ModelNoteManager } from './ModelNoteManager';
-export { HuggingFaceSearchModal } from './HuggingFaceSearchModal';
 
 // Re-export any types that might be needed by consumers
 export type { ModelTreeNode } from '../../../types/models';

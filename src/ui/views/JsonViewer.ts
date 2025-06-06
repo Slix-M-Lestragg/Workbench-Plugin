@@ -1,5 +1,5 @@
 import { TextFileView, WorkspaceLeaf, MarkdownRenderer, App } from 'obsidian'; // Import App
-import { JSON_CUSTOM_ICON_NAME } from '../icons'; // Import icon name
+import { JSON_CUSTOM_ICON_NAME } from '../utilities/icons'; // Import icon name
 import { JSON_VIEW_TYPE } from '../../types/ui';
 
 export class JsonView extends TextFileView {

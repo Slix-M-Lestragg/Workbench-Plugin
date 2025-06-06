@@ -14,7 +14,7 @@ import {
 } from './settings';
 import { ComfyStatus, SystemStats, QueueInfo } from './types/comfy'; // from [src/comfy/types.ts](src/comfy/types.ts)
 import { ComfyApi } from '@saintno/comfyui-sdk';
-import { setupStatusBar, updateStatusBar } from './ui/status_bar'; // from [src/ui/status_bar.ts](src/ui/status_bar.ts)
+import { setupStatusBar, updateStatusBar } from './ui/components/status_bar'; // from [src/ui/status_bar.ts](src/ui/status_bar.ts)
 import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api'; // from [src/comfy/api.ts](src/comfy/api.ts)
 import { startPolling, stopPolling } from './comfy/polling'; // from [src/comfy/polling.ts](src/comfy/polling.ts)
 import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](src/comfy/launch.ts)
@@ -31,7 +31,7 @@ import {
     HUGGINGFACE_ICON_SVG,
     UNKNOWN_PROVIDER_ICON_NAME,
     UNKNOWN_PROVIDER_ICON_SVG 
-} from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
+} from './ui/utilities/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
 import { ModelListView } from './ui/views/ModelListView/ModelListView'; // Import for ModelListView
 import { MODEL_LIST_VIEW_TYPE } from './types/ui'; // Import from centralized ui.ts
 

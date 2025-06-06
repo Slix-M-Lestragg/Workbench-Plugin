@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type Workbench from '../main';
-import { updateStatusBar } from '../ui/status_bar';
+import { updateStatusBar } from '../ui/components/status_bar';
 import type { ComfyStatus } from '../types/comfy';
 import { Notice } from 'obsidian';
 

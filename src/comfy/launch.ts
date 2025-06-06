@@ -2,7 +2,7 @@ import { Notice } from 'obsidian';
 import { exec } from 'child_process';
 import { shell } from 'electron';
 import type Workbench from '../main';
-import { updateStatusBar } from '../ui/status_bar';
+import { updateStatusBar } from '../ui/components/status_bar';
 import { stopPolling } from './polling';
 import { checkComfyConnection } from './api';
 import * as path from 'path'; // Import path module

@@ -1,6 +1,6 @@
 import { PromptBuilder, CallWrapper, NodeProgress, NodeData } from '@saintno/comfyui-sdk';
 import type Workbench from '../main';
-import { updateStatusBar } from '../ui/status_bar';
+import { updateStatusBar } from '../ui/components/status_bar';
 import { Notice } from 'obsidian';
 
 // Define a type for the workflow structure for better type safety

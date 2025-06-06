@@ -3,11 +3,10 @@ import * as path from 'path';
 import type Workbench from './../../../main';
 import { buildModelTree } from './../../../types';
 import { ModelMetadataManager } from '../../../services/models/ModelMetadataManager';
-import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from './../../icons';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../../utilities/icons';
 import { ModelTreeRenderer } from './ModelTreeRenderer';
 import { ModelNoteManager } from './ModelNoteManager';
-import { HuggingFaceSearchModal } from './HuggingFaceSearchModal';
-import { CivitAISearchModal } from './CivitAISearchModal';
+import { UnifiedSearchModal } from '../../modals/UnifiedSearchModal';
 import { findModelsRecursive } from './../../../utils';
 import { MODEL_LIST_VIEW_TYPE, MODEL_LIST_ICON } from '../../../types/ui';
 
@@ -112,16 +111,6 @@ export class ModelListView extends ItemView {
                 }
             });
 
-            // Add CivitAI search button
-            const searchCivitAIBtn = actionsEl.createEl('button', {
-                cls: 'wb-search-civitai-btn',
-                title: 'Search CivitAI models'
-            });
-            setIcon(searchCivitAIBtn, 'search');
-            
-            searchCivitAIBtn.addEventListener('click', () => {
-                this.showCivitAISearchModal();
-            });
         }
 
         // Add HuggingFace refresh button if HuggingFace integration is enabled
@@ -146,16 +135,18 @@ export class ModelListView extends ItemView {
                     refreshHFBtn.removeClass('wb-refreshing');
                 }
             });
+        }
 
-            // Add HuggingFace search button
-            const searchHFBtn = actionsEl.createEl('button', {
-                cls: 'wb-search-hf-btn',
-                title: 'Search HuggingFace models'
+        // Add unified search button (only show if either provider is enabled)
+        if (this.plugin && (this.plugin.settings.enableCivitaiIntegration || this.plugin.settings.enableHuggingfaceIntegration)) {
+            const searchBtn = actionsEl.createEl('button', {
+                cls: 'wb-search-btn',
+                title: 'Search for models'
             });
-            setIcon(searchHFBtn, 'search');
+            setIcon(searchBtn, 'search');
             
-            searchHFBtn.addEventListener('click', () => {
-                this.showHuggingFaceSearchModal();
+            searchBtn.addEventListener('click', () => {
+                this.showUnifiedSearchModal();
             });
         }
 
@@ -242,17 +233,10 @@ export class ModelListView extends ItemView {
     }
 
     /**
-     * Shows the HuggingFace search modal for discovering and downloading models
+     * Shows the unified search modal for discovering and downloading models from multiple providers
      */
-    private showHuggingFaceSearchModal(): void {
-        new HuggingFaceSearchModal(this.app, this.plugin).open();
-    }
-
-    /**
-     * Shows the CivitAI search modal for discovering and downloading models
-     */
-    private showCivitAISearchModal(): void {
-        new CivitAISearchModal(this.app, this.plugin).open();
+    private showUnifiedSearchModal(): void {
+        new UnifiedSearchModal(this.app, this.plugin).open();
     }
 
     /**
