@@ -31,7 +31,7 @@ import {
     UNKNOWN_PROVIDER_ICON_NAME,
     UNKNOWN_PROVIDER_ICON_SVG 
 } from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
-import { ModelListView, MODEL_LIST_VIEW_TYPE } from './ui/ModelListView/ModelListView'; // Added import for new view
+import { ModelListView, MODEL_LIST_VIEW_TYPE } from './ui/ModelListView/ModelListView'; // Import for ModelListView
 
 // Main Plugin Class: Workbench
 // -------------------------
