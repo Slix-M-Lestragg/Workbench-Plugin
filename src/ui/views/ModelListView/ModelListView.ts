@@ -1,17 +1,15 @@
 import { ItemView, WorkspaceLeaf, App, setIcon, Notice, Modal } from 'obsidian';
 import * as path from 'path';
-import type Workbench from '../../main';
-import { buildModelTree } from './../../types';
-import { ModelMetadataManager } from '../../comfy/metadataManager';
-import { HuggingFaceService } from '../../comfy/huggingface';
-import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../icons';
-import type { HuggingFaceModel, HuggingFaceFile } from '../../comfy/types';
+import type Workbench from './../../../main';
+import { buildModelTree } from './../../../types';
+import { ModelMetadataManager } from './../../../comfy/metadataManager';
+import { HuggingFaceService } from './../../../comfy/huggingface';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from './../../icons';
+import type { HuggingFaceModel, HuggingFaceFile } from '../../../types/comfy';
 import { ModelTreeRenderer } from './ModelTreeRenderer';
 import { ModelNoteManager } from './ModelNoteManager';
 import { findModelsRecursive } from './utils';
-
-export const MODEL_LIST_VIEW_TYPE = "comfyui-model-list-view";
-export const MODEL_LIST_ICON = "notebook-tabs"; // Obsidian icon name
+import { MODEL_LIST_VIEW_TYPE, MODEL_LIST_ICON } from '../../../types/ui';
 
 
 export class ModelListView extends ItemView {

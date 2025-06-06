@@ -12,7 +12,7 @@ import {
     getCurrentOS, // from [src/settings.ts](src/settings.ts)
     ComfyInstallType
 } from './settings';
-import { ComfyStatus, SystemStats, QueueInfo } from './comfy/types'; // from [src/comfy/types.ts](src/comfy/types.ts)
+import { ComfyStatus, SystemStats, QueueInfo } from './types/comfy'; // from [src/comfy/types.ts](src/comfy/types.ts)
 import { ComfyApi } from '@saintno/comfyui-sdk';
 import { setupStatusBar, updateStatusBar } from './ui/status_bar'; // from [src/ui/status_bar.ts](src/ui/status_bar.ts)
 import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api'; // from [src/comfy/api.ts](src/comfy/api.ts)
@@ -20,7 +20,8 @@ import { startPolling, stopPolling } from './comfy/polling'; // from [src/comfy/
 import { launchComfyUI } from './comfy/launch'; // from [src/comfy/launch.ts](src/comfy/launch.ts)
 import { registerCommands } from './commands'; // from [src/commands.ts](src/commands.ts)
 import { runWorkflow } from './comfy/generation'; // from [src/comfy/generation.ts](src/comfy/generation.ts)
-import { JsonView, JSON_VIEW_TYPE } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
+import { JsonView } from './ui/JsonViewer'; // from [src/ui/JsonViewer.ts](src/ui/JsonViewer.ts)
+import { JSON_VIEW_TYPE } from './types/ui'; // from [src/types/ui.ts](src/types/ui.ts)
 import { 
     JSON_CUSTOM_ICON_NAME, 
     JSON_CUSTOM_ICON_SVG,
@@ -31,7 +32,8 @@ import {
     UNKNOWN_PROVIDER_ICON_NAME,
     UNKNOWN_PROVIDER_ICON_SVG 
 } from './ui/icons'; // from [src/ui/icons.ts](src/ui/icons.ts)
-import { ModelListView, MODEL_LIST_VIEW_TYPE } from './ui/ModelListView/ModelListView'; // Import for ModelListView
+import { ModelListView } from './ui/views/ModelListView/ModelListView'; // Import for ModelListView
+import { MODEL_LIST_VIEW_TYPE } from './types/ui'; // Import from centralized ui.ts
 
 // Main Plugin Class: Workbench
 // -------------------------

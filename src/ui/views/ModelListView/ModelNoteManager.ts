@@ -1,9 +1,9 @@
 import { Notice, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
-import type Workbench from '../../main';
-import { ModelMetadataManager } from '../../comfy/metadataManager';
-import { EnhancedModelMetadata, ModelProvider } from '../../comfy/types';
+import type Workbench from './../../../main';
+import { ModelMetadataManager } from './../../../comfy/metadataManager';
+import { EnhancedModelMetadata, ModelProvider } from '../../../types/comfy';
 
 /**
  * Handles the creation and management of model notes

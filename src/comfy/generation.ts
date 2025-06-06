@@ -1,4 +1,4 @@
-import { ComfyApi, PromptBuilder, CallWrapper, NodeProgress, NodeData } from '@saintno/comfyui-sdk';
+import { PromptBuilder, CallWrapper, NodeProgress, NodeData } from '@saintno/comfyui-sdk';
 import type Workbench from '../main';
 import { updateStatusBar } from '../ui/status_bar';
 import { Notice } from 'obsidian';

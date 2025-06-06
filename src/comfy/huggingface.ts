@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import type { HuggingFaceModel, HuggingFaceFile } from './types';
+import type { HuggingFaceModel, HuggingFaceFile } from '../types/comfy';
 
 export class HuggingFaceService {
     private static readonly BASE_URL = 'https://huggingface.co';

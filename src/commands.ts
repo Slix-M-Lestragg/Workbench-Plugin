@@ -1,7 +1,7 @@
 import type Workbench from './main';
 import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch'; // Import launch functions
 import { Notice, TFile } from 'obsidian'; // Import TFile
-import { MODEL_LIST_VIEW_TYPE } from './ui/ModelListView/ModelListView'; // Import for view type
+import { MODEL_LIST_VIEW_TYPE } from './types/ui'; // Import for view type
 import { testCivitAIIntegration } from './comfy/testIntegration'; // Import CivitAI test function
 
 /**

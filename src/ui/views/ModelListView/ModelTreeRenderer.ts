@@ -1,15 +1,11 @@
 import { setIcon } from 'obsidian';
 import * as path from 'path';
-import type Workbench from '../../main';
-import { ModelMetadataManager } from '../../comfy/metadataManager';
-import { EnhancedModelMetadata } from '../../comfy/types';
-import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../icons';
+import type Workbench from './../../../main';
+import { ModelMetadataManager } from './../../../comfy/metadataManager';
+import { EnhancedModelMetadata } from '../../../types/comfy';
+import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from './../../icons';
 import { ModelNoteManager } from './ModelNoteManager';
-
-// --- Type definition for the nested tree structure ---
-export type ModelTreeNode = {
-    [key: string]: ModelTreeNode | string[]; // Folders map to nodes, files map to full relative paths
-};
+import { ModelTreeNode } from '../../../types/models';
 
 /**
  * Handles the rendering of the model tree structure in the ModelListView

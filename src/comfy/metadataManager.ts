@@ -1,7 +1,7 @@
 import { TFile, Vault } from 'obsidian';
 import { CivitAIService } from './civitai';
 import { HuggingFaceService } from './huggingface';
-import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVersion, HuggingFaceModel } from './types';
+import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVersion, HuggingFaceModel } from '../types/comfy';
 import { FileHashCalculator } from '../utils/hashCalculator';
 import * as path from 'path';
 

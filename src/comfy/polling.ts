@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type Workbench from '../main';
 import { updateStatusBar } from '../ui/status_bar';
-import type { ComfyStatus } from './types';
+import type { ComfyStatus } from '../types/comfy';
 import { Notice } from 'obsidian';
 
 const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
