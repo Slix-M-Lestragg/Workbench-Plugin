@@ -8,7 +8,7 @@ import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from './../../icons';
 import type { HuggingFaceModel, HuggingFaceFile } from '../../../types/comfy';
 import { ModelTreeRenderer } from './ModelTreeRenderer';
 import { ModelNoteManager } from './ModelNoteManager';
-import { findModelsRecursive } from './utils';
+import { findModelsRecursive } from './../../../utils';
 import { MODEL_LIST_VIEW_TYPE, MODEL_LIST_ICON } from '../../../types/ui';
 
 
