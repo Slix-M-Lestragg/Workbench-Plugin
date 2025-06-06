@@ -160,13 +160,69 @@ export class ModelTreeRenderer {
         // Create a flex container for the model row
         fileItemEl.classList.add('wb-model-row');
         
-        // Left side: Model name as clickable link
+        // Left side: Provider icon + Model name as clickable link
         const leftSide = fileItemEl.createDiv({ cls: 'wb-model-left' });
+        
+        // Get provider from note frontmatter first, fallback to metadata
+        let provider: string | null = null;
+        if (notesFolder) {
+            provider = await this.noteManager.getModelProviderFromNote(fullRelativePath, notesFolder);
+        }
+        
+        // Fallback to metadata provider if no note provider found
+        if (!provider && metadata) {
+            provider = metadata.provider;
+        }
+        
+        // Add provider icon before the filename (inline)
+        if (provider && provider !== 'unknown') {
+            // Get source URL from note frontmatter using the dedicated method
+            let sourceUrl = '#';
+            if (notesFolder) {
+                sourceUrl = await this.noteManager.getModelSourceFromNote(fullRelativePath, notesFolder) || '#';
+            }
+            
+            // Fallback to metadata source if no frontmatter source
+            if (sourceUrl === '#' && metadata) {
+                if (provider === 'civitai' && metadata.civitaiModel?.id) {
+                    sourceUrl = `https://civitai.com/models/${metadata.civitaiModel.id}`;
+                } else if (provider === 'huggingface' && metadata.huggingfaceModel?.id) {
+                    sourceUrl = `https://huggingface.co/${metadata.huggingfaceModel.id}`;
+                }
+            }
+            
+            const iconLink = leftSide.createEl('a', {
+                cls: 'wb-provider-icon-left',
+                href: sourceUrl,
+                title: sourceUrl === '#' ? `${provider} model` : `Open ${provider} model page`
+            });
+            iconLink.style.display = 'inline-block';
+            iconLink.style.marginRight = '8px';
+            iconLink.style.verticalAlign = 'middle';
+            iconLink.style.textDecoration = 'none';
+            
+            if (sourceUrl !== '#') {
+                iconLink.setAttribute('target', '_blank');
+            } else {
+                iconLink.style.cursor = 'default';
+                iconLink.addEventListener('click', (e) => e.preventDefault());
+            }
+            
+            const iconEl = iconLink.createSpan();
+            if (provider === 'civitai') {
+                setIcon(iconEl, CIVITAI_ICON_NAME);
+            } else if (provider === 'huggingface') {
+                setIcon(iconEl, HUGGINGFACE_ICON_NAME);
+            }
+        }
+        
         const fileNameEl = leftSide.createEl('a', { 
             cls: 'wb-model-filename-link',
             text: metadata?.civitaiModel?.name || metadata?.huggingfaceModel?.id || fileName,
             href: '#'
         });
+        fileNameEl.style.display = 'inline-block';
+        fileNameEl.style.verticalAlign = 'middle';
         
         // Make the filename clickable to open the file or note
         fileNameEl.addEventListener('click', async (e) => {
@@ -195,78 +251,53 @@ export class ModelTreeRenderer {
             }
         });
 
-        // Right side: Metadata if available
+        // Right side: Stats (downloads/likes)
         const rightSide = fileItemEl.createDiv({ cls: 'wb-model-right' });
         
-        if (metadata) {
-            if (metadata.provider === 'civitai' && metadata.civitaiModel) {
-                // Website link with CivitAI icon
-                const websiteLink = rightSide.createEl('a', {
-                    cls: 'wb-model-website-link',
-                    href: `https://civitai.com/models/${metadata.civitaiModel.id}`,
-                    title: 'View on CivitAI'
+        // Show stats based on provider
+        if (provider === 'civitai' && metadata?.civitaiModel?.stats) {
+            const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
+            
+            // Download count
+            if (metadata.civitaiModel.stats.downloadCount) {
+                statsContainer.createSpan({ 
+                    cls: 'wb-stat-item',
+                    text: `📥 ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}`
                 });
-                websiteLink.setAttribute('target', '_blank');
-                const iconEl = websiteLink.createSpan({ cls: 'wb-provider-icon' });
-                setIcon(iconEl, CIVITAI_ICON_NAME);
-                
-                // Stats container
-                const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
-                
-                if (metadata.civitaiModel.stats) {
-                    // Download count
-                    if (metadata.civitaiModel.stats.downloadCount) {
-                        statsContainer.createSpan({ 
-                            cls: 'wb-stat-item',
-                            text: `📥 ${metadata.civitaiModel.stats.downloadCount.toLocaleString()}`
-                        });
-                    }
-                    
-                    // Favorite count
-                    if (metadata.civitaiModel.stats.favoriteCount) {
-                        statsContainer.createSpan({ 
-                            cls: 'wb-stat-item',
-                            text: `👍 ${metadata.civitaiModel.stats.favoriteCount.toLocaleString()}`
-                        });
-                    }
-                    
-                    // Rating
-                    if (metadata.civitaiModel.stats.rating) {
-                        statsContainer.createSpan({ 
-                            cls: 'wb-stat-item',
-                            text: `⭐ ${metadata.civitaiModel.stats.rating.toFixed(1)}`
-                        });
-                    }
-                }
-            } else if (metadata.provider === 'huggingface' && metadata.huggingfaceModel) {
-                // Website link with HuggingFace icon
-                const websiteLink = rightSide.createEl('a', {
-                    cls: 'wb-model-website-link',
-                    href: `https://huggingface.co/${metadata.huggingfaceModel.id}`,
-                    title: 'View on HuggingFace'
+            }
+            
+            // Favorite count
+            if (metadata.civitaiModel.stats.favoriteCount) {
+                statsContainer.createSpan({ 
+                    cls: 'wb-stat-item',
+                    text: `👍 ${metadata.civitaiModel.stats.favoriteCount.toLocaleString()}`
                 });
-                websiteLink.setAttribute('target', '_blank');
-                const iconEl = websiteLink.createSpan({ cls: 'wb-provider-icon' });
-                setIcon(iconEl, HUGGINGFACE_ICON_NAME);
-                
-                // Stats container
-                const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
-                
-                // Download count
-                if (metadata.huggingfaceModel.downloads) {
-                    statsContainer.createSpan({ 
-                        cls: 'wb-stat-item',
-                        text: `📥 ${metadata.huggingfaceModel.downloads.toLocaleString()}`
-                    });
-                }
-                
-                // Likes count
-                if (metadata.huggingfaceModel.likes) {
-                    statsContainer.createSpan({ 
-                        cls: 'wb-stat-item',
-                        text: `👍 ${metadata.huggingfaceModel.likes.toLocaleString()}`
-                    });
-                }
+            }
+            
+            // Rating
+            if (metadata.civitaiModel.stats.rating) {
+                statsContainer.createSpan({ 
+                    cls: 'wb-stat-item',
+                    text: `⭐ ${metadata.civitaiModel.stats.rating.toFixed(1)}`
+                });
+            }
+        } else if (provider === 'huggingface' && metadata?.huggingfaceModel) {
+            const statsContainer = rightSide.createDiv({ cls: 'wb-model-stats' });
+            
+            // Download count
+            if (metadata.huggingfaceModel.downloads) {
+                statsContainer.createSpan({ 
+                    cls: 'wb-stat-item',
+                    text: `📥 ${metadata.huggingfaceModel.downloads.toLocaleString()}`
+                });
+            }
+            
+            // Likes count
+            if (metadata.huggingfaceModel.likes) {
+                statsContainer.createSpan({ 
+                    cls: 'wb-stat-item',
+                    text: `👍 ${metadata.huggingfaceModel.likes.toLocaleString()}`
+                });
             }
         }
     }

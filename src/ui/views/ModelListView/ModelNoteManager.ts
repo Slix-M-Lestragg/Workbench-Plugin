@@ -781,4 +781,48 @@ export class ModelNoteManager {
             return null;
         }
     }
+
+    /**
+     * Gets the source URL for a model by reading it from the corresponding note's frontmatter.
+     * @param fullRelativePath The relative path to the model file
+     * @param notesFolder The base folder where notes are stored
+     * @returns The source URL or null if not found
+     */
+    async getModelSourceFromNote(fullRelativePath: string, notesFolder?: string): Promise<string | null> {
+        if (!notesFolder) {
+            return null;
+        }
+
+        try {
+            // Construct the note path
+            const noteFileName = path.basename(fullRelativePath, path.extname(fullRelativePath)) + '.md';
+            const noteSubfolderPath = path.dirname(fullRelativePath);
+            const fullNotePath = path.join(notesFolder, noteSubfolderPath, noteFileName).replace(/\\/g, '/');
+
+            // Check if the note exists and is a file
+            const noteFile = this.plugin.app.vault.getAbstractFileByPath(fullNotePath);
+            if (!noteFile || !('stat' in noteFile)) {
+                return null;
+            }
+
+            // Read the note content
+            const noteContent = await this.plugin.app.vault.read(noteFile as TFile);
+            
+            // Parse frontmatter to get source
+            const frontmatterMatch = noteContent.match(/^---\n([\s\S]*?)\n---/);
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1];
+                
+                // Extract source field
+                const sourceMatch = frontmatter.match(/source:\s*['""]?([^'"\n]+)['""]?/);
+                if (sourceMatch) {
+                    return sourceMatch[1].trim();
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to read source from note:', error);
+        }
+
+        return null;
+    }
 }
