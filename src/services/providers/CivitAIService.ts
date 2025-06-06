@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import { CivitAIModel, CivitAIModelVersion } from '../types/comfy';
+import { CivitAIModel, CivitAIModelVersion } from '../../types/comfy';
 
 export class CivitAIService {
     private static readonly BASE_URL = 'https://civitai.com/api/v1';

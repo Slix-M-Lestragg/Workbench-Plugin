@@ -1,7 +1,7 @@
-import { CivitAIService } from './CivitAIService';
-import { HuggingFaceService } from './HuggingFaceService';
-import type { IModelProvider, IModelProviderService } from './interfaces';
-import type { CivitAIModel, HuggingFaceModel } from '../types/comfy';
+import { CivitAIService } from '../providers/CivitAIService';
+import { HuggingFaceService } from '../providers/HuggingFaceService';
+import type { IModelProvider, IModelProviderService } from '../interfaces';
+import type { CivitAIModel, HuggingFaceModel } from '../../types/comfy';
 
 export type ModelProvider = 'civitai' | 'huggingface' | 'unknown';
 
