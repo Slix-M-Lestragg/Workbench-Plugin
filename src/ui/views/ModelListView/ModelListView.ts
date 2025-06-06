@@ -7,6 +7,7 @@ import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from './../../icons';
 import { ModelTreeRenderer } from './ModelTreeRenderer';
 import { ModelNoteManager } from './ModelNoteManager';
 import { HuggingFaceSearchModal } from './HuggingFaceSearchModal';
+import { CivitAISearchModal } from './CivitAISearchModal';
 import { findModelsRecursive } from './../../../utils';
 import { MODEL_LIST_VIEW_TYPE, MODEL_LIST_ICON } from '../../../types/ui';
 
@@ -109,6 +110,17 @@ export class ModelListView extends ItemView {
                     refreshMetadataBtn.disabled = false;
                     refreshMetadataBtn.removeClass('wb-refreshing');
                 }
+            });
+
+            // Add CivitAI search button
+            const searchCivitAIBtn = actionsEl.createEl('button', {
+                cls: 'wb-search-civitai-btn',
+                title: 'Search CivitAI models'
+            });
+            setIcon(searchCivitAIBtn, 'search');
+            
+            searchCivitAIBtn.addEventListener('click', () => {
+                this.showCivitAISearchModal();
             });
         }
 
@@ -234,6 +246,13 @@ export class ModelListView extends ItemView {
      */
     private showHuggingFaceSearchModal(): void {
         new HuggingFaceSearchModal(this.app, this.plugin).open();
+    }
+
+    /**
+     * Shows the CivitAI search modal for discovering and downloading models
+     */
+    private showCivitAISearchModal(): void {
+        new CivitAISearchModal(this.app, this.plugin).open();
     }
 
     /**
