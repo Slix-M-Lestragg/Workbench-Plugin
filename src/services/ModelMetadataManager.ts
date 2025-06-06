@@ -1,8 +1,8 @@
 import { TFile, Vault } from 'obsidian';
-import { CivitAIService } from './civitai';
-import { HuggingFaceService } from './huggingface';
+import { CivitAIService } from './CivitAIService';
+import { HuggingFaceService } from './HuggingFaceService';
 import { EnhancedModelMetadata, ModelRelationship, CivitAIModel, CivitAIModelVersion, HuggingFaceModel } from '../types/comfy';
-import { FileHashCalculator } from '../utils/hashCalculator';
+import { HashService } from './HashService';
 import * as path from 'path';
 
 /**
@@ -71,7 +71,7 @@ export class ModelMetadataManager {
         try {
             console.log(`📋 MetadataManager: Calculating file hash for "${filename}"...`);
             // Calculate file hash
-            metadata.hash = await FileHashCalculator.calculateSHA256(filePath);
+            metadata.hash = await HashService.calculateSHA256(filePath);
             console.log(`📋 MetadataManager: File hash calculated: ${metadata.hash}`);
 
             // Always try HuggingFace API search first, regardless of path detection
@@ -672,7 +672,7 @@ export class ModelMetadataManager {
         try {
             console.log(`📋 MetadataManager: Calculating file hash for "${filename}"...`);
             // Calculate file hash
-            metadata.hash = await FileHashCalculator.calculateSHA256(filePath);
+            metadata.hash = await HashService.calculateSHA256(filePath);
             console.log(`📋 MetadataManager: File hash calculated: ${metadata.hash}`);
             
             // Call the appropriate provider-specific enrichment method directly

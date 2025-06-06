@@ -2,7 +2,7 @@ import { Notice, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import type Workbench from './../../../main';
-import { ModelMetadataManager } from './../../../comfy/metadataManager';
+import { ModelMetadataManager } from '../../../services/ModelMetadataManager';
 import { EnhancedModelMetadata, ModelProvider } from '../../../types/comfy';
 
 /**

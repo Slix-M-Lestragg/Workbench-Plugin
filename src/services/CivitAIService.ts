@@ -215,6 +215,27 @@ export class CivitAIService {
         }
     }
 
+    async getModelInfo(id: string): Promise<CivitAIModel | null> {
+        // Handle both numeric IDs and string-based model identifiers
+        // For CivitAI, the id could be a numeric model ID or a string that needs parsing
+        let modelId: number;
+        
+        // Try to parse as a number first
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) {
+            modelId = numericId;
+        } else {
+            // If not a number, try to search by name and get the first result
+            const searchResults = await this.searchModelsByName(id);
+            if (searchResults.length === 0) {
+                return null;
+            }
+            modelId = searchResults[0].id;
+        }
+        
+        return await this.getModelById(modelId);
+    }
+
     clearCache() {
         this.cache.clear();
     }
