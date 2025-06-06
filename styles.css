@@ -827,14 +827,77 @@
     cursor: not-allowed;
 }
 
-/* Filter Section */
+/* Provider Section */
+.wb-provider-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.wb-provider-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-normal);
+    min-width: fit-content;
+}
+
+.wb-provider-select {
+    padding: 0.5rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    min-width: 150px;
+}
+
+/* Filter Section - Enhanced Layout */
 .wb-filter-section {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
-    align-items: center;
+    padding: 1rem 0;
+}
+
+.wb-filter-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-end;
     flex-wrap: wrap;
 }
 
+.wb-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 140px;
+}
+
+.wb-filter-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.wb-filter-select {
+    padding: 0.5rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 13px;
+    min-width: 140px;
+}
+
+.wb-filter-select:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* Legacy filter styles (keeping for backward compatibility) */
 .wb-filter-section label {
     font-size: 13px;
     font-weight: 500;
@@ -842,7 +905,7 @@
 }
 
 .wb-task-select,
-.wb-sort-select {
+.wb-sort-select{
     padding: 0.25rem 0.5rem;
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;

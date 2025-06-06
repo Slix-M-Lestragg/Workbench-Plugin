@@ -41,21 +41,12 @@ export class UnifiedSearchModal extends Modal {
         // Search input section
         const searchSection = contentEl.createDiv({ cls: 'wb-search-section' });
         
-        const searchInputContainer = searchSection.createDiv({ cls: 'wb-search-input-container' });
-        const searchInput = searchInputContainer.createEl('input', {
-            type: 'text',
-            placeholder: 'Search for models...',
-            cls: 'wb-search-input'
-        });
-
-        const searchBtn = searchInputContainer.createEl('button', {
-            text: 'Search',
-            cls: 'wb-search-btn'
-        });
-
-        // Provider selection
+        // Provider selection (moved above search input)
         const providerSection = searchSection.createDiv({ cls: 'wb-provider-section' });
-        providerSection.createEl('label', { text: 'Search in:' });
+        providerSection.createEl('label', { 
+            text: 'Search in:', 
+            cls: 'wb-provider-label' 
+        });
         
         const providerSelect = providerSection.createEl('select', { cls: 'wb-provider-select' });
         const providerOptions = [
@@ -73,6 +64,19 @@ export class UnifiedSearchModal extends Modal {
 
         providerSelect.addEventListener('change', () => {
             this.currentProvider = providerSelect.value as SearchProvider;
+        });
+        
+        // Search input container (moved below provider selection)
+        const searchInputContainer = searchSection.createDiv({ cls: 'wb-search-input-container' });
+        const searchInput = searchInputContainer.createEl('input', {
+            type: 'text',
+            placeholder: 'Search for models...',
+            cls: 'wb-search-input'
+        });
+
+        const searchBtn = searchInputContainer.createEl('button', {
+            text: 'Search',
+            cls: 'wb-search-btn'
         });
 
         // Filter options (dynamic based on provider)
@@ -143,8 +147,12 @@ export class UnifiedSearchModal extends Modal {
             // CivitAI specific filters
             const civitaiFilters = filterSection.createDiv({ cls: 'wb-civitai-filters' });
             
-            civitaiFilters.createEl('label', { text: 'Model Type:' });
-            const typeSelect = civitaiFilters.createEl('select', { cls: 'wb-type-select' });
+            // Create a row for Model Type and Base Model
+            const topRow = civitaiFilters.createDiv({ cls: 'wb-filter-row' });
+            
+            const typeGroup = topRow.createDiv({ cls: 'wb-filter-group' });
+            typeGroup.createEl('label', { text: 'Model Type:', cls: 'wb-filter-label' });
+            const typeSelect = typeGroup.createEl('select', { cls: 'wb-type-select wb-filter-select' });
             const typeOptions = [
                 { value: '', text: 'All Types' },
                 { value: 'Checkpoint', text: 'Checkpoint' },
@@ -163,8 +171,9 @@ export class UnifiedSearchModal extends Modal {
                 });
             });
 
-            civitaiFilters.createEl('label', { text: 'Base Model:' });
-            const baseModelSelect = civitaiFilters.createEl('select', { cls: 'wb-basemodel-select' });
+            const baseModelGroup = topRow.createDiv({ cls: 'wb-filter-group' });
+            baseModelGroup.createEl('label', { text: 'Base Model:', cls: 'wb-filter-label' });
+            const baseModelSelect = baseModelGroup.createEl('select', { cls: 'wb-basemodel-select wb-filter-select' });
             const baseModelOptions = [
                 { value: '', text: 'All Base Models' },
                 { value: 'SD 1.5', text: 'SD 1.5' },
@@ -181,8 +190,12 @@ export class UnifiedSearchModal extends Modal {
                 });
             });
 
-            civitaiFilters.createEl('label', { text: 'Sort by:' });
-            const sortSelect = civitaiFilters.createEl('select', { cls: 'wb-sort-select' });
+            // Create a row for Sort by
+            const bottomRow = civitaiFilters.createDiv({ cls: 'wb-filter-row' });
+            
+            const sortGroup = bottomRow.createDiv({ cls: 'wb-filter-group' });
+            sortGroup.createEl('label', { text: 'Sort by:', cls: 'wb-filter-label' });
+            const sortSelect = sortGroup.createEl('select', { cls: 'wb-sort-select wb-filter-select' });
             const sortOptions = [
                 { value: 'Most Downloaded', text: 'Most Downloaded' },
                 { value: 'Most Liked', text: 'Most Liked' },
@@ -202,8 +215,12 @@ export class UnifiedSearchModal extends Modal {
             // HuggingFace specific filters
             const hfFilters = filterSection.createDiv({ cls: 'wb-hf-filters' });
             
-            hfFilters.createEl('label', { text: 'Task Type:' });
-            const taskSelect = hfFilters.createEl('select', { cls: 'wb-task-select' });
+            // Create a row for Task Type and Sort by
+            const hfRow = hfFilters.createDiv({ cls: 'wb-filter-row' });
+            
+            const taskGroup = hfRow.createDiv({ cls: 'wb-filter-group' });
+            taskGroup.createEl('label', { text: 'Task Type:', cls: 'wb-filter-label' });
+            const taskSelect = taskGroup.createEl('select', { cls: 'wb-task-select wb-filter-select' });
             const taskOptions = [
                 { value: '', text: 'All Tasks' },
                 { value: 'text-to-image', text: 'Text to Image' },
@@ -220,8 +237,9 @@ export class UnifiedSearchModal extends Modal {
                 });
             });
 
-            hfFilters.createEl('label', { text: 'Sort by:' });
-            const hfSortSelect = hfFilters.createEl('select', { cls: 'wb-hf-sort-select' });
+            const hfSortGroup = hfRow.createDiv({ cls: 'wb-filter-group' });
+            hfSortGroup.createEl('label', { text: 'Sort by:', cls: 'wb-filter-label' });
+            const hfSortSelect = hfSortGroup.createEl('select', { cls: 'wb-hf-sort-select wb-filter-select' });
             const hfSortOptions = [
                 { value: 'downloads', text: 'Downloads' },
                 { value: 'likes', text: 'Likes' },

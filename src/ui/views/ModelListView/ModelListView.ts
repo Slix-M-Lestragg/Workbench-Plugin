@@ -88,6 +88,19 @@ export class ModelListView extends ItemView {
             }
         });
         
+        // Add unified search button (only show if either provider is enabled)
+        if (this.plugin && (this.plugin.settings.enableCivitaiIntegration || this.plugin.settings.enableHuggingfaceIntegration)) {
+            const searchBtn = actionsEl.createEl('button', {
+                cls: 'wb-refresh-btn',
+                title: 'Search for models'
+            });
+            setIcon(searchBtn, 'search');
+            
+            searchBtn.addEventListener('click', () => {
+                this.showUnifiedSearchModal();
+            });
+        }
+        
         // Add refresh metadata button if CivitAI integration is enabled
         if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
             const refreshMetadataBtn = actionsEl.createEl('button', {
@@ -134,19 +147,6 @@ export class ModelListView extends ItemView {
                     refreshHFBtn.disabled = false;
                     refreshHFBtn.removeClass('wb-refreshing');
                 }
-            });
-        }
-
-        // Add unified search button (only show if either provider is enabled)
-        if (this.plugin && (this.plugin.settings.enableCivitaiIntegration || this.plugin.settings.enableHuggingfaceIntegration)) {
-            const searchBtn = actionsEl.createEl('button', {
-                cls: 'wb-search-btn',
-                title: 'Search for models'
-            });
-            setIcon(searchBtn, 'search');
-            
-            searchBtn.addEventListener('click', () => {
-                this.showUnifiedSearchModal();
             });
         }
 
