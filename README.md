@@ -3,11 +3,13 @@ Workbench bridges the gap between your Obsidian vault and AI tools by providing 
 ## Core Features
 ### 🔗 ComfyUI Integration
 - **Real-time Connection Management**: Live status monitoring with visual indicators (Disconnected, Connecting, Ready, Busy, Error, Launching)
+- **Advanced Connection Manager**: Sophisticated connection handling with automatic retry, connection healing, and state synchronization
 - **Interactive Status Bar & Ribbon**: Click to reveal detailed system information including CPU/RAM/GPU stats, queue status, and connection diagnostics
 - **Direct Workflow Execution**: Run ComfyUI workflows directly from JSON files with progress tracking and real-time feedback
 - **Quick Launch & Access**: Copy workflows to clipboard and launch ComfyUI with a single click, or open the web interface when connected
 - **Cross-Platform Support**: Launch helpers for ComfyUI Desktop (macOS) and script-based installations
 - **System Monitoring**: Real-time system resource monitoring and queue management with automatic polling
+- **WebSocket Integration**: Real-time bidirectional communication with ComfyUI for instant status updates
 ### 🎨 AI Model Management
 - **Unified Model Browser**: Browse and manage your local model collection with enhanced metadata and hierarchical tree view
 - **Multi-Provider Integration**: Seamless access to CivitAI and HuggingFace model repositories with intelligent provider detection
@@ -25,10 +27,12 @@ Workbench bridges the gap between your Obsidian vault and AI tools by providing 
 
 ### 📁 Enhanced File Management
 - **Custom JSON Viewer**: Dedicated viewer for ComfyUI workflow files with syntax highlighting and custom icons
+- **Advanced File Menu Integration**: Enhanced file explorer with context-aware actions via FileMenuManager
 - **Automated Model Notes**: Intelligent note creation and management with provider-specific metadata integration
 - **Provider Icons**: Visual identification of model sources (CivitAI, HuggingFace, Unknown) with custom SVG icons
 - **Context Menu Integration**: Enhanced file explorer with model-specific actions and workflow execution options
 - **File Tree Enhancement**: Hierarchical model organization with expandable directories and metadata overlay
+- **Real-time UI Updates**: Synchronized file operations with immediate UI feedback across all components
 
 ## Commands & Actions
 ### ComfyUI Commands
@@ -73,50 +77,72 @@ Workbench bridges the gap between your Obsidian vault and AI tools by providing 
 
 ## Architecture & Technical Implementation
 
-### Service-Oriented Architecture
-- **Modular Services**: Clean separation of concerns with dedicated services for providers, metadata, and hashing
-- **Interface-Based Design**: Well-defined contracts using TypeScript interfaces for extensibility
-- **Dependency Injection**: Flexible service initialization and configuration management
-- **Type Safety**: Comprehensive type system across all components for reliability
+### Manager-Based Architecture
+The plugin utilizes a sophisticated manager-based architecture for clean separation of concerns and enhanced maintainability:
 
-### Core Services
+- **ConfigManager**: Centralized configuration management with versioning, migrations, and device-specific settings
+- **CommandManager**: Unified command registration and handling system
+- **PluginLifecycleManager**: Orchestrates plugin initialization, startup sequences, and component coordination
+- **ConnectionManager**: Manages ComfyUI API connections, real-time monitoring, and state synchronization
+- **UIStateManager**: Handles UI state management and real-time synchronization across components
+- **FileMenuManager**: Integrates context menu actions and file explorer enhancements
 
-#### Model Provider Services
-- **CivitAIService**: Complete CivitAI API integration with rate limiting and caching
-- **HuggingFaceService**: HuggingFace Hub integration with file listing and metadata extraction
-- **ModelProviderService**: Unified interface for managing multiple providers
+### Core Managers & Services
 
-#### Metadata Management
+#### Configuration & Lifecycle Management
+- **ConfigManager**: Advanced settings management with automatic migrations and device-specific configurations
+- **PluginLifecycleManager**: Coordinated initialization of all plugin components with dependency management
+- **CommandManager**: Centralized command registration with proper cleanup and lifecycle management
+
+#### Connection & API Management
+- **ConnectionManager**: Real-time ComfyUI API integration with WebSocket support and connection monitoring
+- **UIStateManager**: Synchronizes UI state across all components with event-driven updates
+- **FileMenuManager**: Enhanced file explorer integration with model-specific actions
+
+#### Model & Metadata Services
 - **ModelMetadataManager**: Centralized metadata enrichment and relationship discovery
+- **CivitAIService**: Complete CivitAI API integration with rate limiting and intelligent caching
+- **HuggingFaceService**: HuggingFace Hub integration with file listing and metadata extraction
 - **HashService**: Efficient file hashing with smart sampling for large files (>100MB)
-- **Enhanced Metadata**: Rich model information including versions, relationships, and provider-specific data
 
-#### UI Components
-- **ModelListView**: Sophisticated model browser with tree view and metadata overlay
-- **UnifiedSearchModal**: Cross-provider search with advanced filtering and results rendering
-- **Custom Views**: Dedicated JSON viewer and enhanced file explorers
+#### UI Components & Views
+- **ModelListView**: Sophisticated model browser with hierarchical tree view and metadata overlay
+- **UnifiedSearchModal**: Cross-provider search with advanced filtering and real-time results
+- **JsonViewer**: Dedicated ComfyUI workflow viewer with syntax highlighting and custom icons
 
 ### Performance & Reliability
-- **Smart Caching**: Configurable cache expiry (default: 7 days for CivitAI, 1 hour for HuggingFace)
-- **Rate Limiting**: Respectful API usage (1s for CivitAI, 0.5s for HuggingFace)
-- **Error Recovery**: Automatic retry logic with exponential backoff
-- **Background Processing**: Non-blocking operations for large model collections
-- **Memory Management**: Efficient caching with automatic cleanup
+- **Smart Caching**: Configurable cache expiry with provider-specific defaults (7 days for CivitAI, 1 hour for HuggingFace)
+- **Rate Limiting**: Respectful API usage with configurable intervals (1s for CivitAI, 0.5s for HuggingFace)
+- **Error Recovery**: Automatic retry logic with exponential backoff and connection healing
+- **Background Processing**: Non-blocking operations for large model collections and metadata processing
+- **Memory Management**: Efficient caching with automatic cleanup and configurable memory limits
+- **State Synchronization**: Real-time UI state updates across all components with event-driven architecture
 
 ### Security & Privacy
-- **Secure API Key Storage**: Encrypted storage of API credentials in Obsidian's settings
-- **Optional Authentication**: All features work without API keys (with limitations)
-- **Local Processing**: Model hashing and metadata storage remain local
+- **Secure API Key Storage**: Encrypted storage of API credentials using Obsidian's secure settings system
+- **Optional Authentication**: All core features work without API keys (with appropriate rate limiting)
+- **Local Processing**: Model hashing and metadata storage remain completely local to your system
 - **CORS Compliance**: Proper CORS configuration guidance for ComfyUI integration
+- **Data Privacy**: No telemetry or data collection - all processing happens locally
 
 ### Cross-Platform Support
-- **Operating System Detection**: Automatic configuration for macOS, Windows, and Linux
-- **Device-Specific Settings**: Per-OS configuration management
-- **Path Management**: Intelligent path detection and configuration per platform
-- **Launch Scripts**: Support for various ComfyUI installation methods
-- **File System Integration**: Native file explorer integration on all platforms
+- **Operating System Detection**: Automatic OS detection with platform-specific optimizations
+- **Device-Specific Settings**: Independent configuration management for macOS, Windows, and Linux
+- **Path Management**: Intelligent path detection and validation across different file systems
+- **Launch Scripts**: Support for various ComfyUI installation methods (Desktop app, portable, script-based)
+- **File System Integration**: Native file explorer integration with platform-specific context menus
+- **Settings Migration**: Automatic migration of settings between plugin versions with data preservation
 
 ## Configuration
+
+### Enhanced Configuration System
+The plugin features an advanced configuration system with automatic migrations, versioning, and device-specific settings:
+
+- **Automatic Migrations**: Settings are automatically migrated between plugin versions with data preservation
+- **Version Management**: Configuration schema versioning ensures compatibility across updates
+- **Device-Specific Settings**: Independent configurations for different operating systems and devices
+- **Validation & Defaults**: Comprehensive setting validation with intelligent fallback values
+- **Real-time Updates**: Configuration changes are immediately applied across all plugin components
 
 ### Basic Setup
 1. Open Obsidian Settings → Workbench
@@ -175,24 +201,39 @@ The plugin automatically detects your operating system and maintains separate co
 
 Track which source files have inline documentation/comments and which still need it:
 
-- [x] src/main.ts - Main plugin class and lifecycle management ✅ 2025-06-07
-- [x] src/commands.ts - Command registration and handling ✅ 2025-06-07
-- [x] src/settings.ts - Settings interface and configuration ✅ 2025-06-07
-- [ ] src/comfy/launch.ts - ComfyUI launch functionality
-- [ ] src/comfy/api.ts - ComfyUI API integration
-- [ ] src/comfy/polling.ts - Connection polling and monitoring
-- [ ] src/comfy/generation.ts - Workflow execution
+### Core Architecture
+- [x] src/core/main.ts - Main plugin class and lifecycle management ✅ 2025-06-07
+- [x] src/core/ConfigManager.ts - Configuration management with versioning ✅ 2025-06-07
+- [x] src/core/CommandManager.ts - Command registration and handling ✅ 2025-06-07
+- [x] src/core/PluginLifecycleManager.ts - Plugin initialization coordination ✅ 2025-06-07
+- [x] src/core/settings.ts - Settings interface and configuration ✅ 2025-06-07
+
+### Services & API Integration
+- [ ] src/services/ConnectionManager.ts - ComfyUI API connection management
 - [ ] src/services/HashService.ts - File hashing for model identification
 - [ ] src/services/providers/CivitAIService.ts - CivitAI API integration
 - [ ] src/services/providers/HuggingFaceService.ts - HuggingFace API integration
-- [ ] src/services/models/ModelMetadataManager.ts - Metadata enrichment
-- [ ] src/ui/views/ModelListView/ - Model browser interface
-- [ ] src/ui/modals/UnifiedSearchModal.ts - Cross-provider search
+- [ ] src/services/models/ModelMetadataManager.ts - Metadata enrichment and management
+
+### UI Components & Views
+- [ ] src/ui/UIStateManager.ts - UI state management and synchronization
+- [ ] src/ui/FileMenuManager.ts - File explorer context menu integration
+- [ ] src/ui/views/ModelListView/ModelListView.ts - Model browser interface
 - [ ] src/ui/views/JsonViewer.ts - JSON workflow viewer
+- [ ] src/ui/modals/UnifiedSearchModal.ts - Cross-provider search modal
 - [ ] src/ui/components/status_bar.ts - Status bar implementation
 - [ ] src/ui/components/StatusBarPopover.ts - Status popover component
+
+### Legacy ComfyUI Integration (needs refactoring)
+- [ ] src/comfy/launch.ts - ComfyUI launch functionality
+- [ ] src/comfy/api.ts - ComfyUI API integration (superseded by ConnectionManager)
+- [ ] src/comfy/polling.ts - Connection polling (integrated into ConnectionManager)
+- [ ] src/comfy/generation.ts - Workflow execution
+
+### Utilities & Types
 - [ ] src/ui/utilities/icons.ts - Custom icon definitions
-- [x] src/types/ - Type definitions ✅ 2025-06-07
+- [x] src/types/comfy.ts - ComfyUI type definitions ✅ 2025-06-07
+- [x] src/types/ - General type definitions ✅ 2025-06-07
 - [x] styles.css - Stylesheet for UI components ✅ 2025-06-07
 
 ## Contributing
