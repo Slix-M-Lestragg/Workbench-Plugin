@@ -256,10 +256,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('URL for the ComfyUI web interface (shared across devices)')
             .addText(text => text
                 .setPlaceholder('http://localhost:8188')
-                .setValue(this.plugin.settings.comfyApiUrl)
+                .setValue(this.plugin.configManager.getSettings().comfyApiUrl)
                 .onChange(async (value) => {
-                    this.plugin.settings.comfyApiUrl = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ comfyApiUrl: value });
                 }));
 
         // Add setting for Model Notes Folder Path (Device Specific)
@@ -282,10 +281,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Enable CivitAI Integration')
             .setDesc('Enable integration with CivitAI for enhanced model metadata')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enableCivitaiIntegration)
+                .setValue(this.plugin.configManager.getSettings().enableCivitaiIntegration)
                 .onChange(async (value) => {
-                    this.plugin.settings.enableCivitaiIntegration = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ enableCivitaiIntegration: value });
                 })
             );
 
@@ -294,10 +292,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('Optional API key for CivitAI (enables higher rate limits and access to private models)')
             .addText(text => text
                 .setPlaceholder('Enter your CivitAI API key')
-                .setValue(this.plugin.settings.civitaiApiKey || '')
+                .setValue(this.plugin.configManager.getSettings().civitaiApiKey || '')
                 .onChange(async (value) => {
-                    this.plugin.settings.civitaiApiKey = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ civitaiApiKey: value });
                 })
             );
 
@@ -305,10 +302,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Auto-refresh Metadata')
             .setDesc('Automatically refresh model metadata from CivitAI weekly')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.autoRefreshMetadata)
+                .setValue(this.plugin.configManager.getSettings().autoRefreshMetadata)
                 .onChange(async (value) => {
-                    this.plugin.settings.autoRefreshMetadata = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ autoRefreshMetadata: value });
                 })
             );
 
@@ -316,10 +312,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Show CivitAI Ratings')
             .setDesc('Display model ratings from CivitAI in the models list')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showCivitaiRatings)
+                .setValue(this.plugin.configManager.getSettings().showCivitaiRatings)
                 .onChange(async (value) => {
-                    this.plugin.settings.showCivitaiRatings = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ showCivitaiRatings: value });
                 })
             );
 
@@ -327,10 +322,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Show Compatible Models')
             .setDesc('Show suggestions for compatible models (LoRAs for checkpoints, etc.)')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showCompatibleModels)
+                .setValue(this.plugin.configManager.getSettings().showCompatibleModels)
                 .onChange(async (value) => {
-                    this.plugin.settings.showCompatibleModels = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ showCompatibleModels: value });
                 })
             );
 
@@ -341,10 +335,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Enable HuggingFace Integration')
             .setDesc('Enable integration with HuggingFace for model metadata and enhanced features')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enableHuggingfaceIntegration)
+                .setValue(this.plugin.configManager.getSettings().enableHuggingfaceIntegration)
                 .onChange(async (value) => {
-                    this.plugin.settings.enableHuggingfaceIntegration = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ enableHuggingfaceIntegration: value });
                 })
             );
 
@@ -353,10 +346,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('Optional API token for HuggingFace (enables access to private models and higher rate limits)')
             .addText(text => text
                 .setPlaceholder('Enter your HuggingFace API token')
-                .setValue(this.plugin.settings.huggingfaceApiKey || '')
+                .setValue(this.plugin.configManager.getSettings().huggingfaceApiKey || '')
                 .onChange(async (value) => {
-                    this.plugin.settings.huggingfaceApiKey = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ huggingfaceApiKey: value });
                 })
             );
 
@@ -365,12 +357,11 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('How long to cache HuggingFace metadata before refreshing')
             .addText(text => text
                 .setPlaceholder('7')
-                .setValue(this.plugin.settings.huggingfaceCacheExpiry.toString())
+                .setValue(this.plugin.configManager.getSettings().huggingfaceCacheExpiry.toString())
                 .onChange(async (value) => {
                     let days = parseInt(value || '7', 10);
                     if (isNaN(days) || days < 1) days = 7;
-                    this.plugin.settings.huggingfaceCacheExpiry = days;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ huggingfaceCacheExpiry: days });
                 })
             );
 
@@ -378,10 +369,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Show Provider Icons')
             .setDesc('Display icons to differentiate between CivitAI, HuggingFace, and unknown model sources')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showProviderIcons)
+                .setValue(this.plugin.configManager.getSettings().showProviderIcons)
                 .onChange(async (value) => {
-                    this.plugin.settings.showProviderIcons = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ showProviderIcons: value });
                 })
             );
 
@@ -428,12 +418,11 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('How long to wait after launching ComfyUI before checking the API connection (shared across devices).')
             .addText(text => text
                 .setPlaceholder('e.g., 5')
-                .setValue(this.plugin.settings.launchCheckDelaySeconds.toString())
+                .setValue(this.plugin.configManager.getSettings().launchCheckDelaySeconds.toString())
                 .onChange(async (value) => {
                     let delay = parseInt(value || '5', 10);
                     if (isNaN(delay) || delay < 1) delay = 5;
-                    this.plugin.settings.launchCheckDelaySeconds = delay;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ launchCheckDelaySeconds: delay });
                 }));
 
         // -------------------------
@@ -445,10 +434,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Enable Status Polling')
             .setDesc('Periodically check ComfyUI status via API calls (shared across devices).')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enablePolling)
+                .setValue(this.plugin.configManager.getSettings().enablePolling)
                 .onChange(async (value) => {
-                    this.plugin.settings.enablePolling = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ enablePolling: value });
                     if (value && this.plugin.currentComfyStatus === 'Ready') {
                         this.plugin.startPolling();
                     } else {
@@ -461,13 +449,12 @@ export class SampleSettingTab extends PluginSettingTab {
             .setDesc('How often to check the ComfyUI status (minimum 2 seconds, shared across devices).')
             .addText(text => text
                 .setPlaceholder('e.g., 5')
-                .setValue(this.plugin.settings.pollingIntervalSeconds.toString())
+                .setValue(this.plugin.configManager.getSettings().pollingIntervalSeconds.toString())
                 .onChange(async (value) => {
                     let interval = parseInt(value || '5', 10);
                     if (isNaN(interval) || interval < 2) interval = 2;
-                    this.plugin.settings.pollingIntervalSeconds = interval;
-                    await this.plugin.saveSettings();
-                    if (this.plugin.settings.enablePolling &&
+                    await this.plugin.configManager.updateSettings({ pollingIntervalSeconds: interval });
+                    if (this.plugin.configManager.getSettings().enablePolling &&
                         (this.plugin.currentComfyStatus === 'Ready' || this.plugin.currentComfyStatus === 'Busy')) {
                         this.plugin.startPolling();
                     }
@@ -477,10 +464,9 @@ export class SampleSettingTab extends PluginSettingTab {
             .setName('Enable Polling Retry on Error')
             .setDesc('If polling fails, automatically retry (shared across devices).')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enablePollingRetry)
+                .setValue(this.plugin.configManager.getSettings().enablePollingRetry)
                 .onChange(async (value) => {
-                    this.plugin.settings.enablePollingRetry = value;
-                    await this.plugin.saveSettings();
+                    await this.plugin.configManager.updateSettings({ enablePollingRetry: value });
                     if (!value) {
                         this.plugin.pollingRetryCount = 0;
                         if (this.plugin.pollingRetryTimeoutId) {
@@ -490,18 +476,17 @@ export class SampleSettingTab extends PluginSettingTab {
                     }
                 }));
 
-        if (this.plugin.settings.enablePollingRetry) {
+        if (this.plugin.configManager.getSettings().enablePollingRetry) {
             new Setting(pollingTabContent)
                 .setName('Polling Retry Attempts')
                 .setDesc('How many times to retry polling after an error (shared across devices).')
                 .addText(text => text
                     .setPlaceholder('e.g., 3')
-                    .setValue(this.plugin.settings.pollingRetryAttempts.toString())
+                    .setValue(this.plugin.configManager.getSettings().pollingRetryAttempts.toString())
                     .onChange(async (value) => {
                         let attempts = parseInt(value || '3', 10);
                         if (isNaN(attempts) || attempts < 0) attempts = 0;
-                        this.plugin.settings.pollingRetryAttempts = attempts;
-                        await this.plugin.saveSettings();
+                        await this.plugin.configManager.updateSettings({ pollingRetryAttempts: attempts });
                     }));
 
             new Setting(pollingTabContent)
@@ -509,12 +494,11 @@ export class SampleSettingTab extends PluginSettingTab {
                 .setDesc('How long to wait between polling retry attempts (shared across devices).')
                 .addText(text => text
                     .setPlaceholder('e.g., 10')
-                    .setValue(this.plugin.settings.pollingRetryDelaySeconds.toString())
+                    .setValue(this.plugin.configManager.getSettings().pollingRetryDelaySeconds.toString())
                     .onChange(async (value) => {
                         let delay = parseInt(value || '10', 10);
                         if (isNaN(delay) || delay < 1) delay = 1;
-                        this.plugin.settings.pollingRetryDelaySeconds = delay;
-                        await this.plugin.saveSettings();
+                        await this.plugin.configManager.updateSettings({ pollingRetryDelaySeconds: delay });
                     }));
         }
 
@@ -536,19 +520,7 @@ export class SampleSettingTab extends PluginSettingTab {
      * @returns The complete DeviceSpecificSettings for the current OS.
      */
     getCurrentDeviceSettings(): DeviceSpecificSettings {
-        // Ensure the deviceSettings object is initialized
-        if (!this.plugin.settings.deviceSettings) {
-            this.plugin.settings.deviceSettings = { macos: {}, windows: {}, linux: {}, unknown: {} };
-        }
-        if (!this.plugin.settings.deviceSettings[this.currentOS]) {
-            this.plugin.settings.deviceSettings[this.currentOS] = {};
-        }
-
-        // Merge defaults with saved settings for this OS
-        return {
-            ...DEFAULT_DEVICE_SETTINGS,
-            ...this.plugin.settings.deviceSettings[this.currentOS],
-        };
+        return this.plugin.configManager.getCurrentDeviceSettings();
     }
 
     /** Saves a specific device setting.
@@ -559,13 +531,6 @@ export class SampleSettingTab extends PluginSettingTab {
         key: K,
         value: DeviceSpecificSettings[K]
     ) {
-        if (!this.plugin.settings.deviceSettings) {
-            this.plugin.settings.deviceSettings = { macos: {}, windows: {}, linux: {}, unknown: {} };
-        }
-        if (!this.plugin.settings.deviceSettings[this.currentOS]) {
-            this.plugin.settings.deviceSettings[this.currentOS] = {};
-        }
-        this.plugin.settings.deviceSettings[this.currentOS][key] = value;
-        await this.plugin.saveSettings();
+        await this.plugin.configManager.updateDeviceSettings(this.currentOS, { [key]: value });
     }
 }

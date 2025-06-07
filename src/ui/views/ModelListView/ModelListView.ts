@@ -48,11 +48,11 @@ export class ModelListView extends ItemView {
 
     async onOpen(isRefresh = false) {
         // Initialize metadata manager if CivitAI integration is enabled
-        if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
+        if (this.plugin && this.plugin.configManager.getSettings().enableCivitaiIntegration) {
             this.metadataManager = new ModelMetadataManager(
                 this.app.vault,
-                this.plugin.settings.civitaiApiKey,
-                this.plugin.settings.huggingfaceApiKey
+                this.plugin.configManager.getSettings().civitaiApiKey,
+                this.plugin.configManager.getSettings().huggingfaceApiKey
             );
         }
 
@@ -89,7 +89,7 @@ export class ModelListView extends ItemView {
         });
         
         // Add unified search button (only show if either provider is enabled)
-        if (this.plugin && (this.plugin.settings.enableCivitaiIntegration || this.plugin.settings.enableHuggingfaceIntegration)) {
+        if (this.plugin && (this.plugin.configManager.getSettings().enableCivitaiIntegration || this.plugin.configManager.getSettings().enableHuggingfaceIntegration)) {
             const searchBtn = actionsEl.createEl('button', {
                 cls: 'wb-refresh-btn',
                 title: 'Search for models'
@@ -102,7 +102,7 @@ export class ModelListView extends ItemView {
         }
         
         // Add refresh metadata button if CivitAI integration is enabled
-        if (this.plugin && this.plugin.settings.enableCivitaiIntegration) {
+        if (this.plugin && this.plugin.configManager.getSettings().enableCivitaiIntegration) {
             const refreshMetadataBtn = actionsEl.createEl('button', {
                 cls: 'wb-refresh-metadata-btn',
                 title: 'Refresh all model metadata from CivitAI'
@@ -127,7 +127,7 @@ export class ModelListView extends ItemView {
         }
 
         // Add HuggingFace refresh button if HuggingFace integration is enabled
-        if (this.plugin && this.plugin.settings.enableHuggingfaceIntegration) {
+        if (this.plugin && this.plugin.configManager.getSettings().enableHuggingfaceIntegration) {
             const refreshHFBtn = actionsEl.createEl('button', {
                 cls: 'wb-refresh-hf-btn',
                 title: 'Refresh model metadata from HuggingFace'

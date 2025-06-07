@@ -83,7 +83,7 @@ export class ModelTreeRenderer {
                     }
                     
                     // If no HuggingFace match found, try CivitAI API search (only if we should search)
-                    if (!found && !shouldSkipApiSearch && this.metadataManager && this.plugin.settings.enableCivitaiIntegration) {
+                    if (!found && !shouldSkipApiSearch && this.metadataManager && this.plugin.configManager.getSettings().enableCivitaiIntegration) {
                         console.log(`🎨 Attempting CivitAI search for: ${fileName}`);
                         const startTime = Date.now();
                         const result = await this.searchForMetadata(fullRelativePath, 'civitai');

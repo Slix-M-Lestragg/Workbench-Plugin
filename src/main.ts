@@ -20,16 +20,16 @@
 // Error handling utilities
     import { handleUIError, handleConnectionError, handleSettingsError } from './utils/errorHandler';
 
+// Configuration management
+    import { ConfigManager } from './core/ConfigManager';
+
 // Settings and configuration management
     import {
         WorkbenchSettings,
-        DEFAULT_SETTINGS,
         SampleSettingTab,
         OperatingSystem,
         DeviceSpecificSettings,
-        DEFAULT_DEVICE_SETTINGS,
-        getCurrentOS,
-        ComfyInstallType
+        getCurrentOS
     } from './settings';
 
 // Type definitions for ComfyUI integration
@@ -86,6 +86,9 @@ export default class Workbench extends Plugin {
 // ===========================================================================
 // CORE PLUGIN STATE
 // ===========================================================================
+    
+    /** Configuration manager for centralized settings handling */
+    configManager: ConfigManager;
     
     /** Plugin configuration and user settings */
     settings: WorkbenchSettings;
@@ -182,16 +185,13 @@ export default class Workbench extends Plugin {
 // DEVICE AND SYSTEM CONFIGURATION METHODS  
 // ===========================================================================
     /* Merges device-specific settings with default values for the current operating system.
-     * This method ensures that all required device settings have fallback values from defaults.
+     * This method delegates to ConfigManager to ensure that all required device settings 
+     * have fallback values from defaults.
      * 
      * @returns A complete DeviceSpecificSettings object for the current OS with all required properties
      */
     public getCurrentDeviceSettings(): DeviceSpecificSettings {
-        const osSettings = this.settings.deviceSettings?.[this.currentOS] ?? {};
-        return {
-            ...DEFAULT_DEVICE_SETTINGS,
-            ...osSettings
-        };
+        return this.configManager.getCurrentDeviceSettings();
     }
 
 
@@ -299,9 +299,11 @@ export default class Workbench extends Plugin {
      * - Automatic polling restart for existing connections
      */
     async onload() {
-        // Initialize OS detection and load user settings
+        // Initialize OS detection and configuration management
         this.currentOS = getCurrentOS();
-        await this.loadSettings();
+        this.configManager = new ConfigManager(this);
+        await this.configManager.initialize();
+        this.settings = this.configManager.getSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
         // Register custom icons for model providers and UI elements
@@ -495,73 +497,30 @@ export default class Workbench extends Plugin {
 // SETTINGS PERSISTENCE METHODS
 // ===========================================================================
 
-    /* Load user settings from disk with intelligent merging and migration support.
+    /* Load user settings using ConfigManager with intelligent merging and migration support.
      * 
-     * This method provides:
+     * This method delegates to ConfigManager which provides:
      * - Proper default value fallback for missing settings
      * - Device-specific settings merging for cross-platform support
-     * - Legacy setting migration for backwards compatibility
+     * - Versioned migration for backwards compatibility
      * - Safe handling of corrupted or incomplete settings data
      */
     async loadSettings() {
-        const loadedData = await this.loadData();
-        const mergedSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-
-        // Merge top-level settings with loaded data
-        for (const key in mergedSettings) {
-            if (key !== 'deviceSettings' && loadedData && loadedData.hasOwnProperty(key)) {
-                (mergedSettings as Record<string, unknown>)[key] = loadedData[key];
-            }
-        }
-
-        // Merge device-specific settings for each supported operating system
-        mergedSettings.deviceSettings = mergedSettings.deviceSettings || {};
-        for (const osKey of Object.keys(DEFAULT_SETTINGS.deviceSettings) as OperatingSystem[]) {
-            const defaultOsSettings = DEFAULT_SETTINGS.deviceSettings[osKey] || {};
-            const savedOsSettings = loadedData?.deviceSettings?.[osKey] ?? {};
-            mergedSettings.deviceSettings[osKey] = { ...defaultOsSettings, ...savedOsSettings };
-        }
-
-        this.settings = mergedSettings;
-
-        // Legacy setting migration: Move old top-level comfyUiPath to device-specific settings
-        if (loadedData && loadedData.hasOwnProperty('comfyUiPath') && typeof loadedData.comfyUiPath === 'string') {
-            console.log(`Migrating old top-level 'comfyUiPath' setting for OS: ${this.currentOS}`);
-            if (!this.settings.deviceSettings[this.currentOS]) {
-                this.settings.deviceSettings[this.currentOS] = {};
-            }
-            if (!this.settings.deviceSettings[this.currentOS].comfyUiPath) {
-                this.settings.deviceSettings[this.currentOS].comfyUiPath = loadedData.comfyUiPath;
-            }
-        }
-        if (loadedData && loadedData.hasOwnProperty('comfyInstallType') && typeof loadedData.comfyInstallType === 'string') {
-            console.log(`Migrating old top-level 'comfyInstallType' setting for OS: ${this.currentOS}`);
-            if (!this.settings.deviceSettings[this.currentOS]) {
-                this.settings.deviceSettings[this.currentOS] = {};
-            }
-            if (!this.settings.deviceSettings[this.currentOS].comfyInstallType) {
-                this.settings.deviceSettings[this.currentOS].comfyInstallType = loadedData.comfyInstallType as ComfyInstallType;
-            }
-        }
+        await this.configManager.loadSettings();
+        this.settings = this.configManager.getSettings();
     }
 
-    /* Save current settings to disk with legacy cleanup and view synchronization.
+    /* Save current settings using ConfigManager with legacy cleanup and view synchronization.
      * 
-     * This method:
+     * This method delegates to ConfigManager which:
      * - Removes deprecated top-level settings before saving
      * - Persists current settings state to disk
-     * - Updates all open ModelListView instances with new CivitAI settings
+     * - Validates settings before saving
      * - Ensures settings consistency across plugin components
      */
     async saveSettings() {
-        const settingsToSave = { ...this.settings };
-        if (settingsToSave.hasOwnProperty('comfyUiPath')) {
-            delete (settingsToSave as Record<string, unknown>).comfyUiPath;
-        }
-        if (settingsToSave.hasOwnProperty('comfyInstallType')) {
-            delete (settingsToSave as Record<string, unknown>).comfyInstallType;
-        }
-        await this.saveData(settingsToSave);
+        await this.configManager.saveSettings();
+        this.settings = this.configManager.getSettings();
         
         // Update model list views when CivitAI settings change
         this.updateModelListViewSettings();
