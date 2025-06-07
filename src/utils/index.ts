@@ -15,6 +15,10 @@
 // UTILITY EXPORTS
 // ===========================================================================
 
+    // Error Handling System
+    // Centralized error handling with context-aware logging and user notifications
+    export * from './errorHandler';
+
     // File System Operations and Model Detection
     // Exports utilities for scanning directories, detecting AI model files,
     // and handling cross-platform file operations with proper path normalization

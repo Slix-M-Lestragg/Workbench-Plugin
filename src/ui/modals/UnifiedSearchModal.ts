@@ -1,8 +1,9 @@
-import { Modal, App, Notice } from 'obsidian';
+import { Modal, App } from 'obsidian';
 import type Workbench from '../../main';
 import { CivitAIService } from '../../services/providers/CivitAIService';
 import { HuggingFaceService } from '../../services/providers/HuggingFaceService';
 import type { CivitAIModel, HuggingFaceModel, HuggingFaceFile } from '../../types/comfy';
+import { handleUIError, handleProviderError } from '../../utils/errorHandler';
 
 type SearchProvider = 'civitai' | 'huggingface' | 'all';
 
@@ -92,7 +93,7 @@ export class UnifiedSearchModal extends Modal {
             const query = searchInput.value.trim();
 
             if (!query) {
-                new Notice('Please enter a search term');
+                handleUIError(new Error('Empty search term'), 'Please enter a search term');
                 return;
             }
 
@@ -505,7 +506,7 @@ export class UnifiedSearchModal extends Modal {
                 this.showHuggingFaceModelFiles(model, files);
             } catch (error) {
                 console.error('Error fetching model files:', error);
-                new Notice('Error fetching model files');
+                handleProviderError(error, 'Error fetching model files');
             }
         });
     }
@@ -594,7 +595,7 @@ export class UnifiedSearchModal extends Modal {
                     downloadBtn.addEventListener('click', () => {
                         const downloadUrl = file.downloadUrl || `https://civitai.com/api/download/models/${version.id}`;
                         navigator.clipboard.writeText(downloadUrl);
-                        new Notice(`Download URL copied to clipboard: ${file.name}`);
+                        handleUIError(new Error('URL copied'), `Download URL copied to clipboard: ${file.name}`);
                     });
                 });
             }
@@ -655,7 +656,7 @@ export class UnifiedSearchModal extends Modal {
             downloadBtn.addEventListener('click', () => {
                 const downloadUrl = `https://huggingface.co/${model.id}/resolve/main/${file.path}`;
                 navigator.clipboard.writeText(downloadUrl);
-                new Notice(`Download URL copied to clipboard: ${file.path}`);
+                handleUIError(new Error('URL copied'), `Download URL copied to clipboard: ${file.path}`);
             });
         });
 

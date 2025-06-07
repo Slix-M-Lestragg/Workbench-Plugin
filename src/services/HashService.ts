@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { readFileSync, statSync, openSync, readSync, closeSync, fstatSync } from 'fs';
+import { handleHashError } from '../utils/errorHandler';
 
 /**
  * HashService - Centralized file hashing service
@@ -25,7 +26,7 @@ export class HashService {
                 return this.calculateFullHash(filePath, 'sha256');
             }
         } catch (error) {
-            console.error(`📋 HashService: Failed to calculate SHA256 hash for ${filePath}:`, error);
+            handleHashError(error, `Failed to calculate SHA256 hash for ${filePath}`);
             return '';
         }
     }
@@ -46,7 +47,7 @@ export class HashService {
                 return this.calculateFullHash(filePath, 'md5');
             }
         } catch (error) {
-            console.error(`📋 HashService: Failed to calculate MD5 hash for ${filePath}:`, error);
+            handleHashError(error, `Failed to calculate MD5 hash for ${filePath}`);
             return '';
         }
     }
@@ -149,7 +150,7 @@ export class HashService {
             
             return calculatedHash.toLowerCase() === expectedHash.toLowerCase();
         } catch (error) {
-            console.error(`📋 HashService: Failed to verify hash for ${filePath}:`, error);
+            handleHashError(error, `Failed to verify hash for ${filePath}`);
             return false;
         }
     }
@@ -166,7 +167,7 @@ export class HashService {
             
             return { size, isLarge, sizeFormatted };
         } catch (error) {
-            console.error(`📋 HashService: Failed to get file size for ${filePath}:`, error);
+            handleHashError(error, `Failed to get file size for ${filePath}`);
             return { size: 0, isLarge: false, sizeFormatted: '0 B' };
         }
     }

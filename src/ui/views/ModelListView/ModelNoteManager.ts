@@ -1,9 +1,10 @@
-import { Notice, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import type Workbench from './../../../main';
 import { ModelMetadataManager } from '../../../services/models/ModelMetadataManager';
 import { EnhancedModelMetadata, ModelProvider } from '../../../types/comfy';
+import { handleFileError, handleMetadataError, handleUIError, handleProviderError } from '../../../utils/errorHandler';
 
 /**
  * Handles the creation and management of model notes
@@ -59,7 +60,7 @@ export class ModelNoteManager {
                         console.log(`Copying content from source Markdown: ${relativeModelPath}`);
                     } catch (readError) {
                         console.error(`Error reading source Markdown file ${sourceModelFullPath}:`, readError);
-                        new Notice(`Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
+                        handleFileError(readError, `Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
                         // Fallback to default frontmatter if reading fails
                         noteContent = await this.generateDefaultFrontmatter(relativeModelPath, directoryInfo);
                     }
@@ -85,7 +86,7 @@ export class ModelNoteManager {
             }
         } catch (error) {
             console.error(`Error creating model note for ${relativeModelPath} at ${fullNotePath}:`, error);
-            new Notice(`Error creating note for ${path.basename(relativeModelPath)}. Check console.`);
+            handleFileError(error, `Error creating note for ${path.basename(relativeModelPath)}. Check console.`);
         }
     }
 
@@ -287,7 +288,7 @@ export class ModelNoteManager {
                         console.log(`Copying content from source Markdown: ${relativeModelPath}`);
                     } catch (readError) {
                         console.error(`Error reading source Markdown file ${sourceModelFullPath}:`, readError);
-                        new Notice(`Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
+                        handleFileError(readError, `Error reading source file ${path.basename(relativeModelPath)}. Creating basic note.`);
                         noteContent = await this.generateFrontmatterWithMetadata(relativeModelPath, directoryInfo, metadata);
                     }
                     // --- End Markdown Handling ---
@@ -312,7 +313,7 @@ export class ModelNoteManager {
             }
         } catch (error) {
             console.error(`Error creating model note for ${relativeModelPath} at ${fullNotePath}:`, error);
-            new Notice(`Error creating note for ${path.basename(relativeModelPath)}. Check console.`);
+            handleFileError(error, `Error creating note for ${path.basename(relativeModelPath)}. Check console.`);
         }
     }
 
@@ -612,7 +613,7 @@ export class ModelNoteManager {
             const providerMatch = frontmatter.match(/provider:\s*["']?([^"'\n]+)["']?/);
             if (!providerMatch) {
                 console.warn(`No provider found in frontmatter: ${notePath}`);
-                new Notice(`No provider field found in frontmatter. Cannot process provider change.`, 4000);
+                handleProviderError(new Error('No provider found'), `No provider field found in frontmatter. Cannot process provider change.`);
                 return false;
             }
             
@@ -620,7 +621,7 @@ export class ModelNoteManager {
             const noteProvider = providerMatch[1].trim().toLowerCase();
             if (noteProvider !== 'civitai' && noteProvider !== 'huggingface' && noteProvider !== 'unknown') {
                 console.warn(`Invalid provider in note (must be civitai, huggingface, or unknown): ${noteProvider}`);
-                new Notice(`Invalid provider: "${noteProvider}". Provider must be "civitai", "huggingface", or "unknown".`, 5000);
+                handleProviderError(new Error(`Invalid provider: ${noteProvider}`), `Invalid provider: "${noteProvider}". Provider must be "civitai", "huggingface", or "unknown".`);
                 return false;
             }
             
@@ -629,7 +630,7 @@ export class ModelNoteManager {
             if (!modelPathMatch) {
                 // Without model_path in frontmatter, we can't accurately locate the model file
                 console.warn(`No model_path found in frontmatter. Cannot process provider change for note: ${notePath}`);
-                new Notice(`Cannot process provider change: No model_path in frontmatter`, 4000);
+                handleProviderError(new Error('No model_path in frontmatter'), `Cannot process provider change: No model_path in frontmatter`);
                 return false;
             }
             
@@ -658,7 +659,7 @@ export class ModelNoteManager {
             } catch (err) {
                 const errorMessage = `Model file not found at ${fullModelPath}. Cannot process provider change.`;
                 console.warn(errorMessage);
-                new Notice(errorMessage, 5000);
+                handleFileError(err, errorMessage);
                 return false;
             }
             
@@ -669,7 +670,7 @@ export class ModelNoteManager {
             // If provider is set to unknown, no reprocessing needed
             if (noteProvider === 'unknown') {
                 console.log(`Provider set to 'unknown', no reprocessing needed`);
-                new Notice(`Provider set to 'unknown'. No metadata refresh will be performed.\nTo fetch metadata, change provider to 'civitai' or 'huggingface'.`, 5000);
+                handleUIError(new Error('Provider set to unknown'), `Provider set to 'unknown'. No metadata refresh will be performed.\nTo fetch metadata, change provider to 'civitai' or 'huggingface'.`);
                 return false;
             }
             
@@ -680,7 +681,7 @@ export class ModelNoteManager {
             }
             
             console.log(`Provider changed from ${currentMetadata.provider} to ${noteProvider}, reprocessing model metadata...`);
-            new Notice(`Provider changed to ${noteProvider}. Reprocessing model metadata for ${path.basename(modelPath)}...`, 5000);
+            handleUIError(new Error('Provider change'), `Provider changed to ${noteProvider}. Reprocessing model metadata for ${path.basename(modelPath)}...`);
             
             // Force refresh using the target provider
             const newMetadata = await this.forceRefreshWithTargetProvider(fullModelPath, noteProvider as ModelProvider);
@@ -703,15 +704,15 @@ export class ModelNoteManager {
                 // Create a new note with the refreshed metadata
                 await this.createModelNoteWithMetadata(modelPath, modelsBasePath, directoryInfo, newMetadata);
                 
-                new Notice(`Model metadata reprocessed with ${noteProvider} provider`, 3000);
+                handleUIError(new Error('Metadata reprocessed'), `Model metadata reprocessed with ${noteProvider} provider`);
                 return true;
             } else {
-                new Notice(`Failed to find metadata for ${path.basename(modelPath)} using ${noteProvider} provider`, 5000);
+                handleMetadataError(new Error('Metadata not found'), `Failed to find metadata for ${path.basename(modelPath)} using ${noteProvider} provider`);
                 return false;
             }
         } catch (error) {
             console.error("Error processing provider change:", error);
-            new Notice(`Error reprocessing model metadata: ${error.message}`);
+            handleMetadataError(error, `Error reprocessing model metadata: ${error.message}`);
             return false;
         }
     }
@@ -725,20 +726,20 @@ export class ModelNoteManager {
     private async forceRefreshWithTargetProvider(fullModelPath: string, targetProvider: ModelProvider): Promise<EnhancedModelMetadata | null> {
         if (!this.metadataManager) {
             console.error("Metadata manager is not available");
-            new Notice("Cannot search for metadata: Metadata manager not available", 3000);
+            handleMetadataError(new Error('Metadata manager not available'), "Cannot search for metadata: Metadata manager not available");
             return null;
         }
         
         // Skip if provider is "unknown" - can't search with that
         if (targetProvider === 'unknown') {
             console.warn("Cannot search with 'unknown' provider");
-            new Notice("Cannot search with 'unknown' provider. Please specify 'civitai' or 'huggingface'", 4000);
+            handleProviderError(new Error('Unknown provider'), "Cannot search with 'unknown' provider. Please specify 'civitai' or 'huggingface'");
             return null;
         }
         
         try {
             // Show a notice to the user about what's happening
-            new Notice(`Searching for metadata using ${targetProvider} provider. This may take a moment...`, 3000);
+            handleUIError(new Error('Search initiated'), `Searching for metadata using ${targetProvider} provider. This may take a moment...`);
             console.log(`🔍 Searching for metadata from ${targetProvider} for model: ${fullModelPath}`);
             
             // Check if API keys are set for the selected provider
@@ -746,14 +747,14 @@ export class ModelNoteManager {
             if (targetProvider === 'civitai' && (!settings.enableCivitaiIntegration || !settings.civitaiApiKey)) {
                 const errorMsg = `CivitAI integration is ${settings.enableCivitaiIntegration ? 'enabled but API key is missing' : 'disabled'}`;
                 console.warn(errorMsg);
-                new Notice(`Cannot search CivitAI: ${errorMsg}`, 4000);
+                handleProviderError(new Error('CivitAI not configured'), `Cannot search CivitAI: ${errorMsg}`);
                 return null;
             }
             
             if (targetProvider === 'huggingface' && (!settings.enableHuggingfaceIntegration || !settings.huggingfaceApiKey)) {
                 const errorMsg = `HuggingFace integration is ${settings.enableHuggingfaceIntegration ? 'enabled but API key is missing' : 'disabled'}`;
                 console.warn(errorMsg);
-                new Notice(`Cannot search HuggingFace: ${errorMsg}`, 4000);
+                handleProviderError(new Error('HuggingFace not configured'), `Cannot search HuggingFace: ${errorMsg}`);
                 return null;
             }
             
@@ -777,7 +778,7 @@ export class ModelNoteManager {
         } catch (error) {
             const errorMsg = `Failed to search for ${targetProvider} metadata: ${error instanceof Error ? error.message : String(error)}`;
             console.warn(errorMsg, error);
-            new Notice(errorMsg, 5000);
+            handleMetadataError(error, errorMsg);
             return null;
         }
     }

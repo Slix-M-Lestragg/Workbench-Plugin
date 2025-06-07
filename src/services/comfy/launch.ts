@@ -15,7 +15,6 @@
 // ===========================================================================
 
     // Core Obsidian and Node.js Imports
-    import { Notice } from 'obsidian';
     import { exec } from 'child_process';
     import { shell } from 'electron';
     import * as path from 'path';
@@ -25,6 +24,7 @@
     import { updateStatusBar } from './../../ui/components/status_bar';
     import { stopPolling } from './polling';
     import { checkComfyConnection } from './api';
+    import { handleLaunchError, handleUIError, handleSettingsError } from './../../utils/errorHandler';
 
 // ===========================================================================
 // DESKTOP APPLICATION LAUNCH FUNCTIONS
@@ -42,27 +42,26 @@
 export function launchComfyUiDesktopApp(pluginInstance: Workbench): void {
     const platform = window.navigator.platform.toLowerCase();
     if (!platform.includes('mac')) {
-        new Notice('Launching the Desktop App is currently only supported on macOS.');
+        handleUIError(new Error('Desktop app launch not supported on platform'), 'Launching the Desktop App is currently only supported on macOS.');
         return;
     }
 
     const command = 'open -a "ComfyUI"'; // Ensure this matches your app name
     stopPolling(pluginInstance);
     updateStatusBar(pluginInstance, 'Launching', 'Attempting to launch ComfyUI App...');
-    new Notice('Attempting to launch ComfyUI App...');
+    handleUIError(new Error('Launch attempt'), 'Attempting to launch ComfyUI App...');
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            console.error(`Error launching ComfyUI App: ${error.message}`);
-            new Notice(`Error launching ComfyUI App: ${error.message}. Is it installed and named correctly?`);
+            handleLaunchError(error, `Failed to launch ComfyUI App: ${error.message}. Is it installed and named correctly?`);
             updateStatusBar(pluginInstance, 'Error', 'App launch failed');
             return;
         }
         if (stderr) {
-            console.warn(`stderr from app launch command: ${stderr}`);
+            console.warn(`📋 ComfyUI App Launch: stderr output: ${stderr}`);
         }
-        console.log(`ComfyUI App launch command executed: ${stdout}`);
-        new Notice('ComfyUI App launch command sent.');
+        console.log(`📋 ComfyUI App launch command executed: ${stdout}`);
+        handleUIError(new Error('App launch confirmation'), 'ComfyUI App launch command sent.');
 
         const delayMs = pluginInstance.settings.launchCheckDelaySeconds * 1000;
         updateStatusBar(pluginInstance, 'Launching', `App launched, waiting ${pluginInstance.settings.launchCheckDelaySeconds}s...`);
@@ -103,7 +102,7 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
     const installType = comfyInstallType;
 
     if (!basePath) {
-        new Notice('ComfyUI base directory path is not set. Please configure it in settings.');
+        handleSettingsError(new Error('ComfyUI path not configured'), 'ComfyUI base directory path is not set. Please configure it in settings.');
         updateStatusBar(pluginInstance, 'Error', 'ComfyUI path not set');
         return;
     }
@@ -129,7 +128,7 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
             // Consider using exec(`sh ${command}`) or similar if issues arise.
         }
         updateStatusBar(pluginInstance, 'Launching', `Attempting to launch script: ${scriptName}`);
-        new Notice(`Attempting to open ComfyUI script: ${scriptName}`);
+        handleUIError(new Error('Script launch attempt'), `Attempting to open ComfyUI script: ${scriptName}`);
 
     } else if (installType === 'desktop') {
         // --- Desktop Launch ---
@@ -146,10 +145,10 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
             command = `python ${scriptName}`; 
             execOptions.cwd = basePath; // Set working directory for exec
             updateStatusBar(pluginInstance, 'Launching', `Attempting to run: python ${scriptName}`);
-            new Notice(`Attempting to run ComfyUI via: python ${scriptName}`);
+            handleUIError(new Error('Python execution attempt'), `Attempting to run ComfyUI via: python ${scriptName}`);
         }
     } else {
-        new Notice(`Unknown ComfyUI installation type: ${installType}`);
+        handleSettingsError(new Error(`Invalid installation type: ${installType}`), `Unknown ComfyUI installation type: ${installType}`);
         updateStatusBar(pluginInstance, 'Error', 'Unknown install type');
         return;
     }
@@ -165,9 +164,9 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
                     console.error(`Error executing ComfyUI (${scriptName}): ${error.message}`);
                     // Check if it's a file not found error specifically for python
                     if (error.message.includes('ENOENT') || error.message.toLowerCase().includes('not recognized')) {
-                         new Notice(`Error: 'python' command not found. Is Python installed and in your system PATH?`);
+                         handleLaunchError(error, `Error: 'python' command not found. Is Python installed and in your system PATH?`);
                     } else {
-                         new Notice(`Error executing ComfyUI (${scriptName}): ${error.message}. Check console for details.`);
+                         handleLaunchError(error, `Error executing ComfyUI (${scriptName}): ${error.message}. Check console for details.`);
                     }
                     updateStatusBar(pluginInstance, 'Error', 'Execution failed');
                     // Don't proceed to connection check if exec failed immediately
@@ -193,7 +192,7 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
             if (!success) {
                 // shell.openPath can return false if it fails to find an app
                 console.error(`shell.openPath failed for: ${command}`);
-                new Notice(`Failed to open script: ${scriptName}. Check path and file associations.`);
+                handleLaunchError(new Error(`Script launch failed: ${command}`), `Failed to open script: ${scriptName}. Check path and file associations.`);
                 updateStatusBar(pluginInstance, 'Error', 'Script launch failed');
                 return; // Stop if shell.openPath failed
             }
@@ -228,7 +227,7 @@ export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
     } catch (error) {
         // Catch errors primarily from shell.openPath or unexpected sync issues
         console.error(`Failed to initiate ComfyUI launch (${scriptName}):`, error);
-        new Notice(`Error initiating ComfyUI launch: ${error instanceof Error ? error.message : String(error)}. Check path and permissions.`);
+        handleLaunchError(error, `Error initiating ComfyUI launch: ${error instanceof Error ? error.message : String(error)}. Check path and permissions.`);
         updateStatusBar(pluginInstance, 'Error', 'Launch initiation failed');
     }
 }

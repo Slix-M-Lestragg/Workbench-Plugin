@@ -2,6 +2,7 @@ import { CivitAIService } from '../providers/CivitAIService';
 import { HuggingFaceService } from '../providers/HuggingFaceService';
 import type { IModelProvider, IModelProviderService } from '../interfaces';
 import type { CivitAIModel, HuggingFaceModel } from '../../types/comfy';
+import { handleProviderError } from '../../utils/errorHandler';
 
 export type ModelProvider = 'civitai' | 'huggingface' | 'unknown';
 
@@ -94,7 +95,7 @@ export class ModelProviderService implements IModelProviderService {
                 huggingface: hfResults.status === 'fulfilled' ? hfResults.value as HuggingFaceModel[] : []
             };
         } catch (error) {
-            console.error('Error searching across providers:', error);
+            handleProviderError(error, 'Error searching across providers');
             return {
                 civitai: [],
                 huggingface: []
@@ -117,7 +118,7 @@ export class ModelProviderService implements IModelProviderService {
         try {
             return await service.searchModelsByName(query);
         } catch (error) {
-            console.error(`Error searching ${provider}:`, error);
+            handleProviderError(error, `Error searching ${provider}`);
             return [];
         }
     }
@@ -137,7 +138,7 @@ export class ModelProviderService implements IModelProviderService {
         try {
             return await service.getModelInfo(id);
         } catch (error) {
-            console.error(`Error getting model info from ${provider}:`, error);
+            handleProviderError(error, `Error getting model info from ${provider}`);
             return null;
         }
     }

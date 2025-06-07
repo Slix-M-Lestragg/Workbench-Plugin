@@ -1,6 +1,7 @@
 import { PromptBuilder, CallWrapper, NodeProgress, NodeData } from '@saintno/comfyui-sdk';
 import type Workbench from './../../main';
 import { updateStatusBar } from './../../ui/components/status_bar';
+import { handleWorkflowError } from './../../utils/errorHandler';
 import { Notice } from 'obsidian';
 
 // Define a type for the workflow structure for better type safety
@@ -12,9 +13,8 @@ type WorkflowOutputs = 'image_output'; // We'll map the first SaveImage node to 
 
 export async function runWorkflow(pluginInstance: Workbench, workflowData: ComfyWorkflow) {
     if (!pluginInstance.comfyApi || (pluginInstance.currentComfyStatus !== 'Ready' && pluginInstance.currentComfyStatus !== 'Busy')) {
-        new Notice('ComfyUI is not connected or ready.');
-        console.error('Attempted workflow execution while ComfyUI not ready.');
-        updateStatusBar(pluginInstance, pluginInstance.currentComfyStatus, `ComfyUI not ready`); // Update status bar too
+        handleWorkflowError(new Error('ComfyUI is not connected or ready'), 'ComfyUI is not connected or ready');
+        updateStatusBar(pluginInstance, pluginInstance.currentComfyStatus, `ComfyUI not ready`);
         return;
     }
 
@@ -110,8 +110,7 @@ export async function runWorkflow(pluginInstance: Workbench, workflowData: Comfy
 
         runner.onFailed((error, promptId) => {
             const duration = jobStartTime ? ((Date.now() - jobStartTime) / 1000).toFixed(1) : 'N/A';
-            console.error(`Workflow failed (Prompt ${promptId}):`, error);
-            new Notice(`Workflow failed: ${error.message}`);
+            handleWorkflowError(error, `Workflow failed (${duration}s): ${error.message}`);
             updateStatusBar(pluginInstance, 'Error', `Workflow failed (${duration}s): ${error.message}`);
         });
 
@@ -122,8 +121,7 @@ export async function runWorkflow(pluginInstance: Workbench, workflowData: Comfy
         console.log("runner.run() promise resolved (workflow finished or failed).");
 
     } catch (error) {
-        console.error("Error setting up or running workflow:", error);
-        new Notice(`Error during workflow setup: ${error instanceof Error ? error.message : String(error)}`);
+        handleWorkflowError(error, 'Error during workflow setup');
         updateStatusBar(pluginInstance, 'Error', 'Workflow setup error.');
     }
 }

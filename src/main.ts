@@ -14,8 +14,11 @@
 // IMPORTS
 // ===========================================================================
 // Core Obsidian imports for plugin functionality
-    import { Plugin, TFile, Menu, Notice, WorkspaceLeaf, addIcon, setIcon } from 'obsidian';
+    import { Plugin, TFile, Menu, WorkspaceLeaf, addIcon, setIcon } from 'obsidian';
     import * as path from 'path';
+
+// Error handling utilities
+    import { handleUIError, handleConnectionError, handleSettingsError } from './utils/errorHandler';
 
 // Settings and configuration management
     import {
@@ -395,13 +398,13 @@ export default class Workbench extends Plugin {
                                 const workflowJson = await this.app.vault.read(file);
                                 await navigator.clipboard.writeText(workflowJson);
                                 window.open(this.settings.comfyApiUrl, '_blank');
-                                new Notice(`Workflow '${file.name}' copied! Paste it into ComfyUI (Cmd/Ctrl+V).`);
+                                handleUIError(new Error('Workflow copied'), `Workflow '${file.name}' copied! Paste it into ComfyUI (Cmd/Ctrl+V).`);
                             } catch (error) {
                                 console.error("Error copying workflow or opening ComfyUI:", error);
-                                new Notice(`Failed to copy workflow: ${error instanceof Error ? error.message : String(error)}`);
+                                handleUIError(error, `Failed to copy workflow: ${error instanceof Error ? error.message : String(error)}`);
                             }
                         } else {
-                            new Notice("ComfyUI API URL is not set in settings.");
+                            handleSettingsError(new Error('ComfyUI API URL not set'), "ComfyUI API URL is not set in settings.");
                         }
                     });
             });
@@ -439,11 +442,11 @@ export default class Workbench extends Plugin {
      */
     async executeWorkflowFromFile(file: TFile) {
         if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
-            new Notice('ComfyUI is not connected or ready. Please check connection.');
+            handleConnectionError(new Error('ComfyUI not ready'), 'ComfyUI is not connected or ready. Please check connection.');
             return;
         }
         try {
-            new Notice(`Loading workflow: ${file.name}`);
+            handleUIError(new Error('Loading workflow'), `Loading workflow: ${file.name}`);
             const workflowJson = await this.app.vault.read(file);
             const workflowData = JSON.parse(workflowJson);
             console.log(`Running workflow from file: ${file.path}`);
@@ -451,7 +454,7 @@ export default class Workbench extends Plugin {
             await runWorkflow(this, workflowData);
         } catch (error) {
             console.error(`Error running workflow from ${file.path}:`, error);
-            new Notice(`Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
+            handleUIError(error, `Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
             updateStatusBar(this, 'Error', 'Workflow execution failed.');
         }
     }
@@ -638,7 +641,7 @@ export default class Workbench extends Plugin {
                     
                     if (result) {
                         processed = true;
-                        new Notice(`Provider change detected in note: ${path.basename(filePath)}. Model metadata has been refreshed.`, 6000);
+                        handleUIError(new Error('Provider change detected'), `Provider change detected in note: ${path.basename(filePath)}. Model metadata has been refreshed.`);
                         break; // Stop after successful processing
                     }
                 }

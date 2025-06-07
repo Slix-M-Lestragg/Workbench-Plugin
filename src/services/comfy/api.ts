@@ -7,6 +7,7 @@
     import { startPolling, stopPolling, pollStatus } from './polling';
     import { ComfyApi } from '@saintno/comfyui-sdk'; // Still needed for actions
     import type { ComfyStatus, SystemStats, QueueInfo } from './../../types/comfy';
+    import { handleConnectionError, handleApiError } from './../../utils/errorHandler';
 
 // --- Listener Handlers ---
     /** Parses system stats data received from the ComfyUI API.
@@ -18,7 +19,7 @@
     function parseSystemStats(pluginInstance: Workbench, stats: any): SystemStats | null {
         // Basic validation of the input data.
         if (!stats || typeof stats !== 'object') {
-            console.warn("Received invalid system stats data:", stats);
+            handleApiError(new Error("Received invalid system stats data"), "Invalid system stats data received");
             return null;
         }
 
@@ -207,38 +208,32 @@
      * @param wasDisconnected Indicates if the status was 'Disconnected' before this check attempt started. // <-- Add this parameter description
      * @returns Always returns false to indicate connection failure.
      */
-    function handleConnectionFailure(pluginInstance: Workbench, reason: string, isInitialCheck = false): boolean { // <-- Add wasDisconnected parameter
-        // const wasConnecting = pluginInstance.currentComfyStatus === 'Connecting'; // This might be less reliable now, use wasDisconnected instead if needed.
-
-
+    function handleConnectionFailure(pluginInstance: Workbench, reason: string, isInitialCheck = false): boolean {
         // Determine final status and whether to show notice
         let finalStatus: ComfyStatus = 'Error';
-        let showNotice = !isInitialCheck; // Example: Show notice only if it wasn't already disconnected and not the initial check
+        let showNotice = !isInitialCheck;
 
         // Check for common network errors indicating the server is likely offline
         const connectionRefused = reason.includes('Connection refused') || reason.includes('Failed to fetch') || reason.includes('ECONNREFUSED');
 
-        // Logging (already handled in the catch block for the specific wasDisconnected case)
-        // You might adjust logging here based on the new parameter if needed.
+        // Use centralized error handling with appropriate severity
         if (!(isInitialCheck && connectionRefused) && !connectionRefused) {
-             // Avoid double logging the specific case handled in the catch block
-            console.error(`ComfyUI connection failed: ${reason}`);
+            // Log non-connection-refused errors with high severity for non-initial checks
+            handleConnectionError(new Error(reason), `ComfyUI connection failed: ${reason}`);
         }
 
         if ((isInitialCheck) && connectionRefused) {
             finalStatus = 'Disconnected';
-            showNotice = false; // Don't show notice for expected initial failure or failure when already disconnected
+            showNotice = false;
             console.log(`Setting status to Disconnected due to connection failure (Initial: ${isInitialCheck}).`);
         } else {
-            // For other errors (invalid URL, non-200 status, later connection refused), keep Error status
             finalStatus = 'Error';
-            // Show notice only if it failed unexpectedly (not initial/disconnected refusal)
             showNotice = !((isInitialCheck) && connectionRefused);
         }
 
-
-        if (showNotice) {
-            new Notice(`ComfyUI connection failed: ${reason}`);
+        // Only show additional notice if centralized handler didn't already show one
+        if (showNotice && (isInitialCheck || connectionRefused)) {
+            handleConnectionError(new Error(reason), `ComfyUI connection failed: ${reason}`);
         }
 
         // Update the status bar to reflect the determined state.
