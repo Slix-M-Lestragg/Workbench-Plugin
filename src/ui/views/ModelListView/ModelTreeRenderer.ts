@@ -1,6 +1,6 @@
 import { setIcon } from 'obsidian';
 import * as path from 'path';
-import type Workbench from './../../../main';
+import type Workbench from '../../../core/main';
 import { ModelMetadataManager } from '../../../services/models/ModelMetadataManager';
 import { EnhancedModelMetadata } from '../../../types/comfy';
 import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../../utilities/icons';

@@ -1,5 +1,5 @@
 import { PromptBuilder, CallWrapper, NodeProgress, NodeData } from '@saintno/comfyui-sdk';
-import type Workbench from './../../main';
+import type Workbench from '../../core/main';
 import { updateStatusBar } from './../../ui/components/status_bar';
 import { handleWorkflowError } from './../../utils/errorHandler';
 import { Notice } from 'obsidian';

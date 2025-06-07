@@ -16,7 +16,7 @@
 // ===========================================================================
 
     // Core Obsidian and Plugin Imports
-    import type Workbench from '../main';
+    import type Workbench from './main';
     import { Notice, TFile } from 'obsidian';
     
     // ComfyUI Integration
@@ -116,7 +116,7 @@ export function registerCommands(pluginInstance: Workbench): void {
 
             if (!checking) {
                 console.log(`Executing workflow for: ${file.path}`);
-                pluginInstance.runWorkflowFromFile(file).catch(err => {
+                pluginInstance.runWorkflowFromFile(file).catch((err: Error) => {
                     console.error('Error executing workflow:', err);
                     new Notice('Failed to start workflow execution.');
                 });

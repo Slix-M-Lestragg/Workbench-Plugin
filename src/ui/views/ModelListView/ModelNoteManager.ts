@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
-import type Workbench from './../../../main';
+import type Workbench from '../../../core/main';
 import { ModelMetadataManager } from '../../../services/models/ModelMetadataManager';
 import { EnhancedModelMetadata, ModelProvider } from '../../../types/comfy';
 import { handleFileError, handleMetadataError, handleUIError, handleProviderError } from '../../../utils/errorHandler';

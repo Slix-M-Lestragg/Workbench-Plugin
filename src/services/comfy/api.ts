@@ -2,7 +2,7 @@
 // Imports
 // -------------------------
     import { Notice, requestUrl } from 'obsidian';
-    import type Workbench from './../../main';
+    import type Workbench from '../../core/main';
     import { updateStatusBar } from './../../ui/components/status_bar';
     import { startPolling, stopPolling, pollStatus } from './polling';
     import { ComfyApi } from '@saintno/comfyui-sdk'; // Still needed for actions

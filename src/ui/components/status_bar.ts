@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 import { setIcon } from 'obsidian';
-import type Workbench from './../../main'; // Use 'type' for import as it's only used for type annotations
+import type Workbench from '../../core/main'; // Use 'type' for import as it's only used for type annotations
 import type { ComfyStatus } from './../../types/comfy';
 import { showStatusPopover } from './StatusBarPopover'; // Import the new popover function
 
@@ -57,7 +57,7 @@ export function setupStatusBar(pluginInstance: Workbench): void {
     pluginInstance.statusBarItemEl = pluginInstance.addStatusBarItem();
     // Initial status bar update (will also call updateRibbonIcon indirectly if needed, though ribbon isn't created yet)
     updateStatusBar(pluginInstance, 'Disconnected', 'ComfyUI: Offline. Click for status & options.');
-    pluginInstance.statusBarItemEl.onClickEvent((event) => {
+    pluginInstance.statusBarItemEl.onClickEvent((event: MouseEvent) => {
         showStatusPopover(pluginInstance, event, pluginInstance.statusBarItemEl || undefined);
     });
 }

@@ -1,5 +1,5 @@
 import { ButtonComponent } from 'obsidian';
-import type Workbench from './../../main';
+import type Workbench from '../../core/main';
 import type { SystemStats, QueueInfo } from './../../types/comfy';
 import { createPopper, Instance as PopperInstance } from '@popperjs/core'; // Import Popper.js
 

@@ -17,7 +17,7 @@
 // ===========================================================================
 
     // Core Plugin Imports
-    import type Workbench from './../../main';
+    import type Workbench from '../../core/main';
     import { Notice } from 'obsidian';
     
     // UI Components

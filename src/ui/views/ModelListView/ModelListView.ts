@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, App, setIcon, Notice } from 'obsidian';
 import * as path from 'path';
-import type Workbench from './../../../main';
+import type Workbench from '../../../core/main';
 import { buildModelTree } from './../../../types';
 import { ModelMetadataManager } from '../../../services/models/ModelMetadataManager';
 import { CIVITAI_ICON_NAME, HUGGINGFACE_ICON_NAME } from '../../utilities/icons';

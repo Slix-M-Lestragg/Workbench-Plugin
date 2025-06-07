@@ -1,5 +1,5 @@
 import { Modal, App } from 'obsidian';
-import type Workbench from '../../main';
+import type Workbench from '../../core/main';
 import { CivitAIService } from '../../services/providers/CivitAIService';
 import { HuggingFaceService } from '../../services/providers/HuggingFaceService';
 import type { CivitAIModel, HuggingFaceModel, HuggingFaceFile } from '../../types/comfy';

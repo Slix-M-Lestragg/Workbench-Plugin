@@ -14,11 +14,7 @@
 // IMPORTS
 // ===========================================================================
 // Core Obsidian imports for plugin functionality
-    import { Plugin, TFile, Menu, WorkspaceLeaf, addIcon, setIcon } from 'obsidian';
-    import * as path from 'path';
-
-// Error handling utilities
-    import { handleUIError, handleConnectionError, handleSettingsError } from '../utils/errorHandler';
+    import { Plugin, TFile } from 'obsidian';
 
 // Configuration management
     import { ConfigManager } from './ConfigManager';
@@ -36,35 +32,12 @@
     import { ComfyStatus, SystemStats, QueueInfo } from '../types/comfy';
     import { ComfyApi } from '@saintno/comfyui-sdk';
 
-// UI components and status management
-    import { setupStatusBar, updateStatusBar } from '../ui/components/status_bar';
-
-// ComfyUI API and connection management
-    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from '../services/comfy/api';
-    import { startPolling, stopPolling } from '../services/comfy/polling';
-    import { launchComfyUI } from '../services/comfy/launch';
-    import { runWorkflow } from '../services/comfy/generation';
-
-// Command registration and workflow execution
-    import { registerCommands } from './CommandManager';
-
-// Custom views and UI components
-    import { JsonView } from '../ui/views/JsonViewer';
-    import { JSON_VIEW_TYPE } from '../types/ui';
-    import { ModelListView } from '../ui/views/ModelListView/ModelListView';
-    import { MODEL_LIST_VIEW_TYPE } from '../types/ui';
-
-// Custom icons for provider identification
-    import { 
-        JSON_CUSTOM_ICON_NAME, 
-        JSON_CUSTOM_ICON_SVG,
-        CIVITAI_ICON_NAME,
-        CIVITAI_ICON_SVG,
-        HUGGINGFACE_ICON_NAME,
-        HUGGINGFACE_ICON_SVG,
-        UNKNOWN_PROVIDER_ICON_NAME,
-        UNKNOWN_PROVIDER_ICON_SVG 
-    } from '../ui/utilities/icons';
+// Manager classes for organized functionality
+    import { PluginLifecycleManager } from './PluginLifecycleManager';
+    import { ConnectionManager } from '../services/ConnectionManager';
+    import { UIStateManager } from '../ui/UIStateManager';
+    import { FileMenuManager } from '../ui/FileMenuManager';
+    import { ModelNoteHandler } from '../services/ModelNoteHandler';
 
 
 
@@ -107,6 +80,13 @@ export default class Workbench extends Plugin {
     
     /** Operating system detected at plugin load time */
     currentOS: OperatingSystem;
+
+    // Manager instances for organized functionality
+    public lifecycleManager: PluginLifecycleManager;
+    public connectionManager: ConnectionManager;
+    public uiStateManager: UIStateManager;
+    public fileMenuManager: FileMenuManager;
+    public modelNoteHandler: ModelNoteHandler;
 
 
 // ===========================================================================
@@ -152,465 +132,100 @@ export default class Workbench extends Plugin {
 
 
 // ===========================================================================
-// PUBLIC API METHODS
+// PUBLIC API METHODS (Delegated to Managers)
 // ===========================================================================
-    /* Delegated method for starting ComfyUI connection polling
-     * This enables other modules to initiate polling through the main plugin instance
-     */
-    public startPolling = () => startPolling(this);
     
-    /* Delegated method for stopping ComfyUI connection polling  
-     * This enables other modules to stop polling through the main plugin instance
-     */
-    public stopPolling = () => stopPolling(this);
+    /* Delegated method for starting ComfyUI connection polling */
+    public startPolling = () => this.connectionManager.startPolling();
     
-    /* Delegated method for launching ComfyUI application
-     * This enables other modules to launch ComfyUI through the main plugin instance
-     */
-    public launchComfyUI = () => launchComfyUI(this);
+    /* Delegated method for stopping ComfyUI connection polling */
+    public stopPolling = () => this.connectionManager.stopPolling();
     
-    /* Delegated method for checking ComfyUI connection status
-     * This enables other modules to test connectivity through the main plugin instance
-     */
-    public checkComfyConnection = () => checkComfyConnection(this);
+    /* Delegated method for launching ComfyUI application */
+    public launchComfyUI = () => this.connectionManager.launchComfyUI();
     
-    /* Delegated method for executing workflows from files
-     * This enables other modules to run workflows through the main plugin instance
-     * @param file - The TFile containing the workflow JSON
-     */
-    public runWorkflowFromFile = (file: TFile) => this.executeWorkflowFromFile(file);
+    /* Delegated method for checking ComfyUI connection status */
+    public checkComfyConnection = () => this.connectionManager.checkConnection();
+    
+    /* Delegated method for executing workflows from files */
+    public runWorkflowFromFile = (file: TFile) => this.fileMenuManager.executeWorkflowFromFile(file);
+
+    /* Updates the ribbon icon based on the current ComfyUI connection status */
+    public updateRibbonIcon = (status: ComfyStatus) => this.uiStateManager.updateRibbonIcon(status);
 
 
 // ===========================================================================
 // DEVICE AND SYSTEM CONFIGURATION METHODS  
 // ===========================================================================
-    /* Merges device-specific settings with default values for the current operating system.
-     * This method delegates to ConfigManager to ensure that all required device settings 
-     * have fallback values from defaults.
-     * 
-     * @returns A complete DeviceSpecificSettings object for the current OS with all required properties
-     */
+    
+    /* Merges device-specific settings with default values for the current operating system */
     public getCurrentDeviceSettings(): DeviceSpecificSettings {
         return this.configManager.getCurrentDeviceSettings();
     }
 
 
 // ===========================================================================
-// SYSTEM MONITORING AND API METHODS
+// SYSTEM MONITORING AND API METHODS (Delegated to ConnectionManager)
 // ===========================================================================
-    /* Fetch current system statistics from ComfyUI server including CPU, RAM, and GPU usage.
-     * This method provides real-time hardware monitoring capabilities for performance tracking.
-     * 
-     * @returns Promise<SystemStats | null> - System statistics object or null if unavailable
-     */
+    
+    /* Fetch current system statistics from ComfyUI server */
     public async getSystemStats(): Promise<SystemStats | null> {
-        if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
-            console.log("Cannot fetch system stats, ComfyUI not connected.");
-            return null;
-        }
-        try {
-            console.log("1. Fetching system stats from main...", this.comfyApi);
-            return await fetchSystemStats(this);
-        } catch (error) {
-            console.error("Error fetching system stats from main:", error);
-            return null;
-        }
+        return this.connectionManager.getSystemStats();
     }
 
-    /* Fetch current queue information from ComfyUI server including pending and running jobs.
-     * This method provides insight into workflow execution status and queue management.
-     * 
-     * @returns Promise<QueueInfo | null> - Queue information object or null if unavailable
-     */
+    /* Fetch current queue information from ComfyUI server */
     public async getQueueInfo(): Promise<QueueInfo | null> {
-        if (!this.comfyApi || this.currentComfyStatus === 'Disconnected' || this.currentComfyStatus === 'Error') {
-            console.log("Cannot fetch queue info, ComfyUI not connected.");
-            return null;
-        }
-        try {
-            return await fetchQueueInfo(this);
-        } catch (error) {
-            console.error("Error fetching queue info from main:", error);
-            return null;
-        }
-    }
-
-
-// ===========================================================================
-// UI STATE MANAGEMENT METHODS
-// ===========================================================================
-    /* Updates the ribbon icon based on the current ComfyUI connection status.
-     * This method provides visual feedback to users about the current state of ComfyUI integration.
-     * 
-     * The icon changes dynamically to reflect different states:
-     * - 'image': Default launch state (Disconnected)
-     * - 'app-window': Ready/Busy states (can open web interface)
-     * - 'loader-2': Transitional states (Connecting/Launching)
-     * - 'alert-circle': Error state (needs attention)
-     * 
-     * @param status - The current ComfyUI connection status
-     */
-    public updateRibbonIcon(status: ComfyStatus): void {
-        if (!this.ribbonIconEl) {
-            // Add a warning if the element doesn't exist when this is called
-            console.warn("Workbench: updateRibbonIcon called but this.ribbonIconEl is not set.");
-            return;
-        }
-
-        // Log the attempt to update
-        console.log(`Workbench: Attempting to update ribbon icon. Status: ${status}, Element:`, this.ribbonIconEl);
-
-        let iconName = 'image'; // Default icon (e.g., launch)
-        let tooltip = 'Launch ComfyUI';
-
-        if (status === 'Ready' || status === 'Busy') {
-            iconName = 'app-window'; // Icon for opening the web UI
-            tooltip = 'Open ComfyUI Web Interface';
-            if (!this.settings.comfyApiUrl?.trim()) {
-                tooltip = 'Cannot Open ComfyUI (URL not set)';
-            }
-        } else if (status === 'Connecting' || status === 'Launching') {
-            iconName = 'loader-2'; // Icon for intermediate states
-            tooltip = `ComfyUI: ${status}...`;
-        } else if (status === 'Error') {
-            iconName = 'alert-circle'; // Icon for error state
-            tooltip = 'ComfyUI Error - Click to attempt launch';
-        }
-        // 'Disconnected' uses the default 'image' icon and 'Launch ComfyUI' tooltip
-
-        // Log the icon and tooltip being set
-        console.log(`Workbench: Setting ribbon icon to '${iconName}' with tooltip '${tooltip}'`);
-        setIcon(this.ribbonIconEl, iconName);
-        this.ribbonIconEl.ariaLabel = tooltip;
+        return this.connectionManager.getQueueInfo();
     }
 
 
 // ===========================================================================
 // PLUGIN LIFECYCLE METHODS
 // ===========================================================================
-    /* Plugin initialization method called when the plugin is loaded.
-     * 
-     * This method orchestrates the complete plugin setup process including:
-     * - Operating system detection and settings initialization
-     * - Custom icon registration for provider identification
-     * - UI component initialization (status bar, ribbon, custom views)
-     * - Event listener registration for file operations
-     * - Initial ComfyUI connection attempt with proper error handling
-     * - Automatic polling restart for existing connections
-     */
+    
+    /* Plugin initialization method called when the plugin is loaded */
     async onload() {
-        // Initialize OS detection and configuration management
+        // Initialize core plugin state
         this.currentOS = getCurrentOS();
         this.configManager = new ConfigManager(this);
         await this.configManager.initialize();
         this.settings = this.configManager.getSettings();
         this.addSettingTab(new SampleSettingTab(this.app, this));
 
-        // Register custom icons for model providers and UI elements
-        addIcon(JSON_CUSTOM_ICON_NAME, JSON_CUSTOM_ICON_SVG);
-        addIcon(CIVITAI_ICON_NAME, CIVITAI_ICON_SVG);
-        addIcon(HUGGINGFACE_ICON_NAME, HUGGINGFACE_ICON_SVG);
-        addIcon(UNKNOWN_PROVIDER_ICON_NAME, UNKNOWN_PROVIDER_ICON_SVG);
-        console.log("Registered custom icons.");
+        // Initialize managers
+        this.lifecycleManager = new PluginLifecycleManager(this);
+        this.connectionManager = new ConnectionManager(this);
+        this.uiStateManager = new UIStateManager(this);
+        this.fileMenuManager = new FileMenuManager(this);
+        this.modelNoteHandler = new ModelNoteHandler(this);
 
-        // Initialize UI components and register plugin commands
-        setupStatusBar(this);
-        registerCommands(this); // This will now set this.ribbonIconEl
-
-        // Update ribbon icon to reflect current status after commands are registered
-        this.updateRibbonIcon(this.currentComfyStatus);
-
-        // Register custom view for JSON workflow files with syntax highlighting
-        this.registerView(JSON_VIEW_TYPE, (leaf: WorkspaceLeaf) => new JsonView(this.app, leaf));
-        this.registerExtensions(["json"], JSON_VIEW_TYPE);
-        console.log(`Registered JSON view for '.json' files.`);
-
-        // Register Model List view for browsing and managing AI models
-        this.registerView(
-            MODEL_LIST_VIEW_TYPE,
-            (leaf: WorkspaceLeaf) => new ModelListView(leaf, this.app, this)
-        );
-        console.log(`Registered ComfyUI Model List view.`);
-
-        // Register context menu items for JSON workflow files
-        this.registerEvent(this.app.workspace.on('file-menu', (menu: Menu, file) => {
-            if (file instanceof TFile && file.extension === 'json') {
-                this.addCopyAndOpenComfyMenuItem(menu, file);
-                this.addRunWorkflowMenuItem(menu, file);
-            }
-        }));
-
-        // Register file modification listener for automatic model note processing
-        this.registerEvent(this.app.vault.on('modify', async (file) => {
-            if (file instanceof TFile && file.extension === 'md') {
-                await this.handleModelNoteModification(file);
-            }
-        }));
-
-        // Perform initial connection check with retry logic after a brief delay
-        setTimeout(() => {
-            console.log("Performing initial ComfyUI connection check...");
-            if (this.currentComfyStatus === 'Disconnected') {
-                // Pass true to indicate this is the initial check
-                this.checkComfyConnection().then(connected => {
-                    if (connected) {
-                        console.log("Initial connection successful.");
-                    } else {
-                        // Failure is handled within checkComfyConnection/handleConnectionFailure
-                        // It will set status to Disconnected if it was a typical server offline error
-                        console.log("Initial connection check indicated server is not reachable.");
-                    }
-                }).catch(error => {
-                    // Catch unexpected errors during the check itself
-                    console.error("Unexpected error during initial connection check:", error);
-                    // Ensure status reflects an error in this case
-                    updateStatusBar(this, 'Error', 'Initial check failed unexpectedly');
-                    this.currentComfyStatus = 'Error';
-                });
-            } else {
-                console.log(`Skipping initial connection check, status is: ${this.currentComfyStatus}`);
-                if (this.settings.enablePolling && this.pollingIntervalId === null &&
-                    (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy')) {
-                    console.log("Restarting polling for existing connection.");
-                    this.startPolling();
-                }
-            }
-        }, 1000);
+        // Delegate initialization to lifecycle manager
+        await this.lifecycleManager.initialize();
     }
 
-
-// ===========================================================================
-// FILE MENU INTEGRATION METHODS
-// ===========================================================================
-    /* Add "Copy Workflow & Open ComfyUI" context menu item for JSON workflow files.
-     * This provides users with a quick way to copy workflow data and open the ComfyUI interface.
-     * 
-     * @param menu - The current file context menu reference
-     * @param file - The JSON workflow file being right-clicked
-     */
-    addCopyAndOpenComfyMenuItem(menu: Menu, file: TFile) {
-        const apiUrlString = this.settings.comfyApiUrl?.trim();
-        if (apiUrlString) {
-            menu.addItem((item) => {
-                item.setTitle("Copy Workflow & Open ComfyUI")
-                    .setIcon("copy-plus")
-                    .onClick(async () => {
-                        if (this.settings.comfyApiUrl) {
-                            try {
-                                const workflowJson = await this.app.vault.read(file);
-                                await navigator.clipboard.writeText(workflowJson);
-                                window.open(this.settings.comfyApiUrl, '_blank');
-                                handleUIError(new Error('Workflow copied'), `Workflow '${file.name}' copied! Paste it into ComfyUI (Cmd/Ctrl+V).`);
-                            } catch (error) {
-                                console.error("Error copying workflow or opening ComfyUI:", error);
-                                handleUIError(error, `Failed to copy workflow: ${error instanceof Error ? error.message : String(error)}`);
-                            }
-                        } else {
-                            handleSettingsError(new Error('ComfyUI API URL not set'), "ComfyUI API URL is not set in settings.");
-                        }
-                    });
-            });
-        }
-    }
-
-    /* Add "Run ComfyUI Workflow" context menu item for JSON workflow files.
-     * This enables direct workflow execution from the file context menu when ComfyUI is connected.
-     * 
-     * @param menu - The current file context menu reference  
-     * @param file - The JSON workflow file being right-clicked
-     */
-    addRunWorkflowMenuItem(menu: Menu, file: TFile) {
-        if (this.currentComfyStatus === 'Ready' || this.currentComfyStatus === 'Busy') {
-            menu.addItem((item) => {
-                item.setTitle("Run ComfyUI Workflow")
-                    .setIcon("play-circle")
-                    .onClick(async () => {
-                        await this.executeWorkflowFromFile(file);
-                    });
-            });
-        } else if (this.currentComfyStatus !== 'Disconnected' && this.currentComfyStatus !== 'Error') {
-            menu.addItem((item) => {
-                item.setTitle("Run ComfyUI Workflow (ComfyUI not ready)")
-                    .setIcon("play-circle")
-                    .setDisabled(true);
-            });
-        }
-    }
-
-    /* Execute a ComfyUI workflow from a JSON file with comprehensive error handling.
-     * This method loads, parses, and executes workflow files through the ComfyUI API.
-     * 
-     * @param file - The JSON file containing the workflow definition
-     */
-    async executeWorkflowFromFile(file: TFile) {
-        if (!this.comfyApi || (this.currentComfyStatus !== 'Ready' && this.currentComfyStatus !== 'Busy')) {
-            handleConnectionError(new Error('ComfyUI not ready'), 'ComfyUI is not connected or ready. Please check connection.');
-            return;
-        }
-        try {
-            handleUIError(new Error('Loading workflow'), `Loading workflow: ${file.name}`);
-            const workflowJson = await this.app.vault.read(file);
-            const workflowData = JSON.parse(workflowJson);
-            console.log(`Running workflow from file: ${file.path}`);
-            updateStatusBar(this, 'Busy', `Running workflow: ${file.name}`);
-            await runWorkflow(this, workflowData);
-        } catch (error) {
-            console.error(`Error running workflow from ${file.path}:`, error);
-            handleUIError(error, `Failed to run workflow: ${error instanceof Error ? error.message : String(error)}`);
-            updateStatusBar(this, 'Error', 'Workflow execution failed.');
-        }
-    }
-
-
-// ===========================================================================
-// PLUGIN CLEANUP AND UNLOAD METHODS
-// ===========================================================================
-
-    /* Plugin cleanup method called when the plugin is unloaded.
-     * 
-     * This method ensures proper resource cleanup including:
-     * - Status bar element removal
-     * - Polling process termination
-     * - WebSocket connection closure
-     * - API client cleanup to prevent memory leaks
-     */
+    /* Plugin cleanup method called when the plugin is unloaded */
     onunload() {
-        console.log("Unloading Workbench plugin.");
-        this.statusBarItemEl?.remove();
-        this.stopPolling();
-        if (this.comfyApi) {
-            try {
-                const comfyApiWithClose = this.comfyApi as ComfyApi & { close?: () => void };
-                if (typeof comfyApiWithClose.close === 'function') {
-                    comfyApiWithClose.close();
-                    console.log("Closed ComfyUI WebSocket connection on unload.");
-                }
-            } catch (e) {
-                console.warn("Error closing ComfyUI connection on unload:", e);
-            }
-            this.comfyApi = null;
-        }
+        this.lifecycleManager?.cleanup();
+        this.connectionManager?.stopPolling();
     }
 
 
 // ===========================================================================
 // SETTINGS PERSISTENCE METHODS
 // ===========================================================================
-
-    /* Load user settings using ConfigManager with intelligent merging and migration support.
-     * 
-     * This method delegates to ConfigManager which provides:
-     * - Proper default value fallback for missing settings
-     * - Device-specific settings merging for cross-platform support
-     * - Versioned migration for backwards compatibility
-     * - Safe handling of corrupted or incomplete settings data
-     */
+    
+    /* Load user settings using ConfigManager */
     async loadSettings() {
         await this.configManager.loadSettings();
         this.settings = this.configManager.getSettings();
     }
 
-    /* Save current settings using ConfigManager with legacy cleanup and view synchronization.
-     * 
-     * This method delegates to ConfigManager which:
-     * - Removes deprecated top-level settings before saving
-     * - Persists current settings state to disk
-     * - Validates settings before saving
-     * - Ensures settings consistency across plugin components
-     */
+    /* Save current settings using ConfigManager */
     async saveSettings() {
         await this.configManager.saveSettings();
         this.settings = this.configManager.getSettings();
         
-        // Update model list views when CivitAI settings change
-        this.updateModelListViewSettings();
-    }
-
-    /* Update all open ModelListView instances with current CivitAI settings.
-     * This ensures that provider configuration changes are immediately reflected
-     * in all active model browser instances without requiring a restart.
-     */
-    private updateModelListViewSettings(): void {
-        const modelListLeaves = this.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
-        modelListLeaves.forEach(leaf => {
-            const view = leaf.view;
-            if ('updateCivitAISettings' in view && typeof view.updateCivitAISettings === 'function') {
-                (view as { updateCivitAISettings: () => void }).updateCivitAISettings();
-            }
-        });
-    }
-
-
-// ===========================================================================
-// MODEL NOTE MANAGEMENT METHODS
-// ===========================================================================
-    /* Handle modifications to model note files with automatic provider change detection.
-     * 
-     * This method monitors changes to markdown files in the configured model notes folder
-     * and automatically processes provider metadata changes, ensuring model information
-     * stays synchronized with external provider services.
-     * 
-     * Key features:
-     * - Automatic detection of files within the model notes folder
-     * - Provider change detection and processing
-     * - Integration with ModelNoteManager for metadata updates
-     * - User feedback for successful provider changes
-     * - Robust error handling for file processing issues
-     * 
-     * @param file - The modified markdown file to process
-     */
-    private async handleModelNoteModification(file: TFile): Promise<void> {
-        const deviceSettings = this.getCurrentDeviceSettings();
-        const modelNotesFolder = deviceSettings.modelNotesFolderPath?.trim();
-        
-        // If model notes folder isn't set, we can't determine if this is a model note
-        if (!modelNotesFolder) {
-            console.log("Model notes folder not set in settings, skipping note modification check");
-            return;
-        }
-        
-        // Check if the modified file is in the model notes folder
-        const filePath = file.path;
-        if (!filePath.startsWith(modelNotesFolder)) {
-            // Not a model note or it's outside the configured folder
-            return; 
-        }
-        
-        try {
-            console.log(`Detected modification to potential model note: ${filePath}`);
-            
-            // Just pass the full file path to the ModelNoteManager
-            // The manager will extract the model path from the frontmatter
-            // We don't need to calculate a relative path here
-            
-            // Find and process with the appropriate ModelNoteManager
-            const modelListLeaves = this.app.workspace.getLeavesOfType(MODEL_LIST_VIEW_TYPE);
-            if (modelListLeaves.length === 0) {
-                console.log("No ModelListView instances found to process note modification");
-                return;
-            }
-            
-            let processed = false;
-            
-            for (const leaf of modelListLeaves) {
-                const view = leaf.view as ModelListView;
-                if (view && view.noteManager) {
-                    // This might be a provider change, let the note manager handle it
-                    const result = await view.noteManager.detectAndProcessProviderChange(filePath);
-                    
-                    if (result) {
-                        processed = true;
-                        handleUIError(new Error('Provider change detected'), `Provider change detected in note: ${path.basename(filePath)}. Model metadata has been refreshed.`);
-                        break; // Stop after successful processing
-                    }
-                }
-            }
-            
-            if (!processed) {
-                console.log(`No model found or no provider change detected for note: ${filePath}`);
-            }
-        } catch (error) {
-            console.error(`Error handling model note modification for ${filePath}:`, error);
-        }
+        // Update model list views when settings change
+        this.uiStateManager.updateModelListViewSettings();
     }
 }
