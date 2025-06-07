@@ -1,15 +1,43 @@
-import { Notice } from 'obsidian';
-import { exec } from 'child_process';
-import { shell } from 'electron';
-import type Workbench from '../main';
-import { updateStatusBar } from '../ui/components/status_bar';
-import { stopPolling } from './polling';
-import { checkComfyConnection } from './api';
-import * as path from 'path'; // Import path module
-
 /**
+ * ComfyUI Launch Management for Workbench Plugin
+ * 
+ * This file contains functions for launching ComfyUI across different platforms and installation types including:
+ * - Native desktop application launching (macOS specific)
+ * - Script-based ComfyUI launching (cross-platform)
+ * - Platform detection and launch method selection
+ * - Launch status monitoring and connection verification
+ * - Error handling and user feedback for launch operations
+ * - Integration with polling system for connection management
+ */
+
+// ===========================================================================
+// IMPORTS AND DEPENDENCIES
+// ===========================================================================
+
+    // Core Obsidian and Node.js Imports
+    import { Notice } from 'obsidian';
+    import { exec } from 'child_process';
+    import { shell } from 'electron';
+    import * as path from 'path';
+    
+    // Workbench Plugin Imports
+    import type Workbench from '../main';
+    import { updateStatusBar } from '../ui/components/status_bar';
+    import { stopPolling } from './polling';
+    import { checkComfyConnection } from './api';
+
+// ===========================================================================
+// DESKTOP APPLICATION LAUNCH FUNCTIONS
+// ===========================================================================
+
+/*
  * Launches the ComfyUI Desktop Application (macOS specific).
- * @param pluginInstance The instance of the Workbench plugin.
+ * 
+ * This function handles launching the native ComfyUI desktop application on macOS systems.
+ * It performs platform detection, executes the launch command, and manages the launch
+ * sequence including status updates and connection verification timing.
+ * 
+ * @param pluginInstance - The instance of the Workbench plugin for settings and state management
  */
 export function launchComfyUiDesktopApp(pluginInstance: Workbench): void {
     const platform = window.navigator.platform.toLowerCase();
@@ -50,10 +78,21 @@ export function launchComfyUiDesktopApp(pluginInstance: Workbench): void {
     });
 }
 
+// ===========================================================================
+// SCRIPT-BASED LAUNCH FUNCTIONS
+// ===========================================================================
 
-/**
+/*
  * Launches ComfyUI based on the selected installation type and platform.
- * @param pluginInstance The instance of the Workbench plugin.
+ * 
+ * This function handles launching ComfyUI via various methods including:
+ * - Script-based installations (run_*.bat, run_*.sh)
+ * - Portable installations with direct execution
+ * - Platform-specific command construction and execution
+ * - Launch validation and error handling
+ * - Status monitoring and connection verification
+ * 
+ * @param pluginInstance - The instance of the Workbench plugin for configuration and state
  */
 export async function launchComfyUI(pluginInstance: Workbench): Promise<void> {
     const platform = window.navigator.platform.toLowerCase();

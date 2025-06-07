@@ -1,13 +1,6 @@
-# Obsidian Workbench Plugin
-
-A sophisticated plugin for Obsidian that transforms your knowledge base into a comprehensive AI workflow and model management hub. Workbench provides seamless integration with ComfyUI, intelligent model discovery, and unified access to multiple AI model repositories through a modern, service-oriented architecture.
-
-## Purpose
-
 Workbench bridges the gap between your Obsidian vault and AI tools by providing deep integration with ComfyUI, intelligent model management with automatic metadata enrichment, and unified search across multiple AI model providers. Whether you're managing extensive model collections, executing complex workflows, or researching AI models from various sources, Workbench keeps everything organized, searchable, and accessible within Obsidian's familiar interface.
 
 ## Core Features
-
 ### 🔗 ComfyUI Integration
 - **Real-time Connection Management**: Live status monitoring with visual indicators (Disconnected, Connecting, Ready, Busy, Error, Launching)
 - **Interactive Status Bar & Ribbon**: Click to reveal detailed system information including CPU/RAM/GPU stats, queue status, and connection diagnostics
@@ -15,7 +8,6 @@ Workbench bridges the gap between your Obsidian vault and AI tools by providing 
 - **Quick Launch & Access**: Copy workflows to clipboard and launch ComfyUI with a single click, or open the web interface when connected
 - **Cross-Platform Support**: Launch helpers for ComfyUI Desktop (macOS) and script-based installations
 - **System Monitoring**: Real-time system resource monitoring and queue management with automatic polling
-
 ### 🎨 AI Model Management
 - **Unified Model Browser**: Browse and manage your local model collection with enhanced metadata and hierarchical tree view
 - **Multi-Provider Integration**: Seamless access to CivitAI and HuggingFace model repositories with intelligent provider detection
@@ -39,7 +31,6 @@ Workbench bridges the gap between your Obsidian vault and AI tools by providing 
 - **File Tree Enhancement**: Hierarchical model organization with expandable directories and metadata overlay
 
 ## Commands & Actions
-
 ### ComfyUI Commands
 - **Launch ComfyUI App (macOS)**: Open the native ComfyUI desktop application
 - **Launch ComfyUI Script**: Run your configured script or portable installation
@@ -184,28 +175,25 @@ The plugin automatically detects your operating system and maintains separate co
 
 Track which source files have inline documentation/comments and which still need it:
 
-### Completed Documentation
-- [x] src/main.ts - Main plugin class and lifecycle management
-- [x] src/commands.ts - Command registration and handling
-- [x] src/settings.ts - Settings interface and configuration
-- [x] src/comfy/launch.ts - ComfyUI launch functionality
-- [x] src/comfy/api.ts - ComfyUI API integration
-- [x] src/comfy/polling.ts - Connection polling and monitoring
-- [x] src/comfy/generation.ts - Workflow execution
-- [x] src/services/HashService.ts - File hashing for model identification
-- [x] src/services/providers/CivitAIService.ts - CivitAI API integration
-- [x] src/services/providers/HuggingFaceService.ts - HuggingFace API integration
-- [x] src/services/models/ModelMetadataManager.ts - Metadata enrichment
-- [x] src/ui/views/ModelListView/ - Model browser interface
-- [x] src/ui/modals/UnifiedSearchModal.ts - Cross-provider search
-
-### Pending Documentation
+- [x] src/main.ts - Main plugin class and lifecycle management ✅ 2025-06-07
+- [x] src/commands.ts - Command registration and handling ✅ 2025-06-07
+- [x] src/settings.ts - Settings interface and configuration ✅ 2025-06-07
+- [ ] src/comfy/launch.ts - ComfyUI launch functionality
+- [ ] src/comfy/api.ts - ComfyUI API integration
+- [ ] src/comfy/polling.ts - Connection polling and monitoring
+- [ ] src/comfy/generation.ts - Workflow execution
+- [ ] src/services/HashService.ts - File hashing for model identification
+- [ ] src/services/providers/CivitAIService.ts - CivitAI API integration
+- [ ] src/services/providers/HuggingFaceService.ts - HuggingFace API integration
+- [ ] src/services/models/ModelMetadataManager.ts - Metadata enrichment
+- [ ] src/ui/views/ModelListView/ - Model browser interface
+- [ ] src/ui/modals/UnifiedSearchModal.ts - Cross-provider search
 - [ ] src/ui/views/JsonViewer.ts - JSON workflow viewer
 - [ ] src/ui/components/status_bar.ts - Status bar implementation
 - [ ] src/ui/components/StatusBarPopover.ts - Status popover component
 - [ ] src/ui/utilities/icons.ts - Custom icon definitions
-- [ ] src/types/ - Type definitions (partially documented)
-- [ ] styles.css - Stylesheet for UI components
+- [x] src/types/ - Type definitions ✅ 2025-06-07
+- [x] styles.css - Stylesheet for UI components ✅ 2025-06-07
 
 ## Contributing
 

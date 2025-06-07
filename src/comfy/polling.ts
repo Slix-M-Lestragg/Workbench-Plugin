@@ -1,16 +1,59 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type Workbench from '../main';
-import { updateStatusBar } from '../ui/components/status_bar';
-import type { ComfyStatus } from '../types/comfy';
-import { Notice } from 'obsidian';
-
-const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
-const RETRY_DELAY_MS = 10000; // Wait 10 seconds before retrying
-const MAX_RETRIES = 3; // Maximum number of retries
-
 /**
- * Polls the ComfyUI status endpoint.
- * @param pluginInstance The instance of the Workbench plugin.
+ * ComfyUI Connection Polling for Workbench Plugin
+ * 
+ * This file manages continuous monitoring of ComfyUI connection status including:
+ * - Periodic status polling with configurable intervals
+ * - Queue monitoring for running and pending workflows
+ * - Connection health checking and automatic recovery
+ * - Error handling and retry logic with exponential backoff
+ * - Status bar integration for real-time feedback
+ * - Graceful degradation and connection loss handling
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// ===========================================================================
+// IMPORTS AND DEPENDENCIES
+// ===========================================================================
+
+    // Core Plugin Imports
+    import type Workbench from '../main';
+    import { Notice } from 'obsidian';
+    
+    // UI Components
+    import { updateStatusBar } from '../ui/components/status_bar';
+    
+    // Type Definitions
+    import type { ComfyStatus } from '../types/comfy';
+
+// ===========================================================================
+// POLLING CONFIGURATION CONSTANTS
+// ===========================================================================
+
+    // Standard polling interval for connection monitoring
+    const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
+    
+    // Retry delay after connection failures
+    const RETRY_DELAY_MS = 10000; // Wait 10 seconds before retrying
+    
+    // Maximum retry attempts before giving up
+    const MAX_RETRIES = 3; // Maximum number of retries
+
+// ===========================================================================
+// CORE POLLING FUNCTIONS
+// ===========================================================================
+
+/*
+ * Polls the ComfyUI status endpoint for connection and queue information.
+ * 
+ * This function performs comprehensive status checking including:
+ * - ComfyUI API availability verification
+ * - Queue status monitoring (running and pending workflows)
+ * - Status determination based on queue activity
+ * - Error handling and graceful degradation
+ * - Status bar updates with real-time information
+ * 
+ * @param pluginInstance - The instance of the Workbench plugin for API access and state management
  */
 export async function pollStatus(pluginInstance: Workbench): Promise<void> {
     const { comfyApi, settings } = pluginInstance;

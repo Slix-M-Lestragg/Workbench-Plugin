@@ -1,10 +1,40 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
 /**
+ * File System Utilities for Workbench Plugin
+ * 
+ * This file contains utility functions for file system operations and model management including:
+ * - Model file detection and classification by extension
+ * - Recursive directory scanning for model collections
+ * - File type validation and filtering
+ * - Directory information gathering for note generation
+ * - Cross-platform path handling and normalization
+ * - Error handling for file system operations
+ */
+
+// ===========================================================================
+// IMPORTS AND DEPENDENCIES
+// ===========================================================================
+
+    // Node.js Core Modules
+    import * as fs from 'fs';
+    import * as path from 'path';
+
+// ===========================================================================
+// MODEL FILE DETECTION UTILITIES
+// ===========================================================================
+
+/*
  * Determines if a file is a model file based on its extension.
- * @param filename The filename to check.
- * @returns True if the file is considered a model file.
+ * 
+ * Supports common AI model formats including:
+ * - SafeTensors (.safetensors) - Recommended format for model storage
+ * - PyTorch formats (.ckpt, .pth, .pt) - Standard PyTorch model files
+ * - GGUF (.gguf) - GPT-Generated Unified Format for language models
+ * - TensorFlow formats (.h5, .pb, .tflite) - TensorFlow model formats
+ * - ONNX (.onnx) - Open Neural Network Exchange format
+ * - Other formats (.bin, .model, .trt) - Various model container formats
+ * 
+ * @param filename - The filename to check for model file extensions
+ * @returns True if the file is considered a model file
  */
 export function isModelFile(filename: string): boolean {
     const extension = path.extname(filename).toLowerCase();
@@ -15,12 +45,24 @@ export function isModelFile(filename: string): boolean {
     return modelExtensions.includes(extension);
 }
 
-/**
+// ===========================================================================
+// RECURSIVE MODEL SCANNING UTILITIES
+// ===========================================================================
+
+/*
  * Recursively finds all model files within a directory and its subdirectories.
- * Also gathers information about related files in the same directories for note generation.
- * @param dirPath The absolute path to the directory to search.
- * @param baseModelsPath The absolute path to the root 'models' directory, used for calculating relative paths.
- * @returns A promise that resolves to an object containing model files and directory info.
+ * 
+ * This function performs comprehensive directory traversal to:
+ * - Locate all model files based on extension matching
+ * - Gather information about related files for note generation
+ * - Build directory structure information for model organization
+ * - Handle file system errors gracefully with proper logging
+ * - Calculate relative paths from the base models directory
+ * - Skip hidden files and directories (starting with '.')
+ * 
+ * @param dirPath - The absolute path to the directory to search
+ * @param baseModelsPath - The absolute path to the root 'models' directory for relative path calculation
+ * @returns Promise resolving to object containing model files and directory information
  */
 export async function findModelsRecursive(dirPath: string, baseModelsPath: string): Promise<{
     modelFiles: string[];
