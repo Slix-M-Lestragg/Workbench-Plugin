@@ -18,10 +18,10 @@
     import * as path from 'path';
 
 // Error handling utilities
-    import { handleUIError, handleConnectionError, handleSettingsError } from './utils/errorHandler';
+    import { handleUIError, handleConnectionError, handleSettingsError } from '../utils/errorHandler';
 
 // Configuration management
-    import { ConfigManager } from './core/ConfigManager';
+    import { ConfigManager } from './ConfigManager';
 
 // Settings and configuration management
     import {
@@ -33,26 +33,26 @@
     } from './settings';
 
 // Type definitions for ComfyUI integration
-    import { ComfyStatus, SystemStats, QueueInfo } from './types/comfy';
+    import { ComfyStatus, SystemStats, QueueInfo } from '../types/comfy';
     import { ComfyApi } from '@saintno/comfyui-sdk';
 
 // UI components and status management
-    import { setupStatusBar, updateStatusBar } from './ui/components/status_bar';
+    import { setupStatusBar, updateStatusBar } from '../ui/components/status_bar';
 
 // ComfyUI API and connection management
-    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './services/comfy/api';
-    import { startPolling, stopPolling } from './services/comfy/polling';
-    import { launchComfyUI } from './services/comfy/launch';
-    import { runWorkflow } from './services/comfy/generation';
+    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from '../services/comfy/api';
+    import { startPolling, stopPolling } from '../services/comfy/polling';
+    import { launchComfyUI } from '../services/comfy/launch';
+    import { runWorkflow } from '../services/comfy/generation';
 
 // Command registration and workflow execution
-    import { registerCommands } from './commands';
+    import { registerCommands } from './CommandManager';
 
 // Custom views and UI components
-    import { JsonView } from './ui/views/JsonViewer';
-    import { JSON_VIEW_TYPE } from './types/ui';
-    import { ModelListView } from './ui/views/ModelListView/ModelListView';
-    import { MODEL_LIST_VIEW_TYPE } from './types/ui';
+    import { JsonView } from '../ui/views/JsonViewer';
+    import { JSON_VIEW_TYPE } from '../types/ui';
+    import { ModelListView } from '../ui/views/ModelListView/ModelListView';
+    import { MODEL_LIST_VIEW_TYPE } from '../types/ui';
 
 // Custom icons for provider identification
     import { 
@@ -64,7 +64,7 @@
         HUGGINGFACE_ICON_SVG,
         UNKNOWN_PROVIDER_ICON_NAME,
         UNKNOWN_PROVIDER_ICON_SVG 
-    } from './ui/utilities/icons';
+    } from '../ui/utilities/icons';
 
 
 

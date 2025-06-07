@@ -1,7 +1,7 @@
 /**
- * Command Registration for Workbench Plugin
+ * Command Manager for Workbench Plugin
  * 
- * This file defines and registers all available commands for the Workbench Plugin including:
+ * This module defines and registers all available commands for the Workbench Plugin including:
  * - ComfyUI launch commands for different platforms and installation types
  * - Connection management commands (connect, disconnect, check status)
  * - Model management commands (open model browser, refresh metadata)
@@ -16,15 +16,15 @@
 // ===========================================================================
 
     // Core Obsidian and Plugin Imports
-    import type Workbench from './main';
+    import type Workbench from '../main';
     import { Notice, TFile } from 'obsidian';
     
     // ComfyUI Integration
-    import { launchComfyUiDesktopApp, launchComfyUI } from './services/comfy/launch';
-    import { testCivitAIIntegration } from './services/comfy/testIntegration';
+    import { launchComfyUiDesktopApp, launchComfyUI } from '../services/comfy/launch';
+    import { testCivitAIIntegration } from '../services/comfy/testIntegration';
     
     // UI Types and Constants
-    import { MODEL_LIST_VIEW_TYPE } from './types/ui';
+    import { MODEL_LIST_VIEW_TYPE } from '../types/ui';
 
 /**
  * Registers all Workbench plugin commands with the Obsidian command palette.

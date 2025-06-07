@@ -24,7 +24,7 @@ import {
     OperatingSystem,
     getCurrentOS,
     ComfyInstallType
-} from '../settings';
+} from './settings';
 
 // ===========================================================================
 // CONFIGURATION INTERFACES

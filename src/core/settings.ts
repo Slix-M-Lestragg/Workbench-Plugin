@@ -18,7 +18,7 @@
 
     // Core Obsidian imports for settings UI and plugin integration
     import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
-    import type Workbench from './main';
+    import type Workbench from '../main';
 
 
 // ===========================================================================
