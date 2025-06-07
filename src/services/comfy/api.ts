@@ -2,11 +2,11 @@
 // Imports
 // -------------------------
     import { Notice, requestUrl } from 'obsidian';
-    import type Workbench from '../main';
-    import { updateStatusBar } from '../ui/components/status_bar';
+    import type Workbench from './../../main';
+    import { updateStatusBar } from './../../ui/components/status_bar';
     import { startPolling, stopPolling, pollStatus } from './polling';
     import { ComfyApi } from '@saintno/comfyui-sdk'; // Still needed for actions
-    import type { ComfyStatus, SystemStats, QueueInfo } from '../types/comfy';
+    import type { ComfyStatus, SystemStats, QueueInfo } from './../../types/comfy';
 
 // --- Listener Handlers ---
     /** Parses system stats data received from the ComfyUI API.

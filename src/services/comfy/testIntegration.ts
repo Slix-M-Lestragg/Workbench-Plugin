@@ -1,5 +1,5 @@
 import { Notice } from 'obsidian';
-import { CivitAIService } from '../services/providers/CivitAIService';
+import { CivitAIService } from './../../services/providers/CivitAIService';
 
 export async function testCivitAIIntegration(apiKey?: string): Promise<void> {
     const service = new CivitAIService(apiKey);

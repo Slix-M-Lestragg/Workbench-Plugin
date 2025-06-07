@@ -21,8 +21,8 @@
     import * as path from 'path';
     
     // Workbench Plugin Imports
-    import type Workbench from '../main';
-    import { updateStatusBar } from '../ui/components/status_bar';
+    import type Workbench from './../../main';
+    import { updateStatusBar } from './../../ui/components/status_bar';
     import { stopPolling } from './polling';
     import { checkComfyConnection } from './api';
 

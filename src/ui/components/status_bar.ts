@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-inferrable-types */
 import { setIcon } from 'obsidian';
-import type Workbench from '../main'; // Use 'type' for import as it's only used for type annotations
-import type { ComfyStatus } from '../types/comfy';
+import type Workbench from './../../main'; // Use 'type' for import as it's only used for type annotations
+import type { ComfyStatus } from './../../types/comfy';
 import { showStatusPopover } from './StatusBarPopover'; // Import the new popover function
 
 /**

@@ -17,14 +17,14 @@
 // ===========================================================================
 
     // Core Plugin Imports
-    import type Workbench from '../main';
+    import type Workbench from './../../main';
     import { Notice } from 'obsidian';
     
     // UI Components
-    import { updateStatusBar } from '../ui/components/status_bar';
+    import { updateStatusBar } from './../../ui/components/status_bar';
     
     // Type Definitions
-    import type { ComfyStatus } from '../types/comfy';
+    import type { ComfyStatus } from './../../types/comfy';
 
 // ===========================================================================
 // POLLING CONFIGURATION CONSTANTS

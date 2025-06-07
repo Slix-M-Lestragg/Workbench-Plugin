@@ -37,10 +37,10 @@
     import { setupStatusBar, updateStatusBar } from './ui/components/status_bar';
 
 // ComfyUI API and connection management
-    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './comfy/api';
-    import { startPolling, stopPolling } from './comfy/polling';
-    import { launchComfyUI } from './comfy/launch';
-    import { runWorkflow } from './comfy/generation';
+    import { checkComfyConnection, fetchSystemStats, fetchQueueInfo } from './services/comfy/api';
+    import { startPolling, stopPolling } from './services/comfy/polling';
+    import { launchComfyUI } from './services/comfy/launch';
+    import { runWorkflow } from './services/comfy/generation';
 
 // Command registration and workflow execution
     import { registerCommands } from './commands';

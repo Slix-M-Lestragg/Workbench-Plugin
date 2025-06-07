@@ -20,8 +20,8 @@
     import { Notice, TFile } from 'obsidian';
     
     // ComfyUI Integration
-    import { launchComfyUiDesktopApp, launchComfyUI } from './comfy/launch';
-    import { testCivitAIIntegration } from './comfy/testIntegration';
+    import { launchComfyUiDesktopApp, launchComfyUI } from './services/comfy/launch';
+    import { testCivitAIIntegration } from './services/comfy/testIntegration';
     
     // UI Types and Constants
     import { MODEL_LIST_VIEW_TYPE } from './types/ui';
